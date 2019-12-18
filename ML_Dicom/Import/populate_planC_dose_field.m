@@ -207,7 +207,12 @@ switch fieldname
         %Columns
         nCols  = getTagValue(attr, '00280011');
         
-        imgOri = getTagValue(attr, '00200037');
+        imgOri = dcm2ml_Element(dcmobj.get(hex2dec('00200037')));
+		
+		if isempty(imgOri)
+			dataS = [];
+			return;
+		end
         
         % Check for oblique scan
         isOblique = 0;
@@ -290,7 +295,12 @@ switch fieldname
         %Rows
         nRows = getTagValue(attr, '00280010');
         
-        imgOri = getTagValue(attr, '00200037');
+        imgOri = dcm2ml_Element(dcmobj.get(hex2dec('00200037')));
+		
+		if isempty(imgOri)
+			dataS = [];
+			return;
+		end
         
         % Check for oblique scan
         isOblique = 0;
@@ -352,7 +362,13 @@ switch fieldname
         
     case 'horizontalGridInterval'
         %Pixel Spacing
-        pixspac = getTagValue(attr, '00280030');
+        pixspac = dcm2ml_Element(dcmobj.get(hex2dec('00280030')));
+		
+		if isempty(pixspac)
+			dataS = [];
+			return;
+		end
+		
         dataS = abs(pixspac(2)) / 10;
         
 %         %Convert from DICOM mm to CERR cm.
@@ -369,7 +385,13 @@ switch fieldname
         
     case 'verticalGridInterval'
         %Pixel Spacing
-        pixspac = getTagValue(attr, '00280030');
+        pixspac = dcm2ml_Element(dcmobj.get(hex2dec('00280030')));
+		
+		if isempty(pixspac)
+			dataS = [];
+			return;
+		end
+		
         dataS = -abs(pixspac(1)) / 10;
         
 %         %Convert from DICOM mm to CERR cm, negate to match CERR Y dir.
@@ -476,7 +498,12 @@ switch fieldname
             doseV = dicomread(DOSE.file);
             doseV = squeeze(doseV);
             mread = 1;
-        end
+		end
+		
+		if isempty(doseV)
+			dataS = [];
+			return;
+		end
         
         %Dose Grid Scaling
         dGS = getTagValue(attr, '3004000E');
@@ -528,9 +555,14 @@ switch fieldname
         
     case 'zValues'
         %Image Position (Patient)
-        iPP = getTagValue(attr, '00200032');
-        imgOri = getTagValue(attr, '00200037');
-
+        iPP = dcm2ml_Element(dcmobj.get(hex2dec('00200032')));
+        imgOri = dcm2ml_Element(dcmobj.get(hex2dec('00200037')));
+		
+		if isempty(imgOri)
+			dataS = [];
+			return;
+		end
+		
         % Check if oblique
         isOblique = 0;
         if max(abs(abs(imgOri(:)) - [1 0 0 0 1 0]')) > 1e-3

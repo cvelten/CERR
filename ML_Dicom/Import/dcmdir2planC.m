@@ -159,7 +159,7 @@ for scanNum = 1:numScans
     sliceNormV = ImageOrientationPatientV([2 3 1]) .* ImageOrientationPatientV([6 4 5]) ...
         - ImageOrientationPatientV([3 1 2]) .* ImageOrientationPatientV([5 6 4]);
     
-    % Calculate the distance of ‘ImagePositionPatient’ along the slice direction cosine
+    % Calculate the distance of ï¿½ImagePositionPatientï¿½ along the slice direction cosine
     numSlcs = length(planC{indexS.scan}(scanNum).scanInfo);
     distV = zeros(1,numSlcs);
     for slcNum = 1:numSlcs
@@ -251,67 +251,70 @@ for scanNum = 1:numScans
     N = length(planC{indexS.dose});
     if N > 0
         % Now, translate the coordinates for dose
-        for doseno = 1:N
-            dose = planC{indexS.dose}(doseno);
-            if ~isfield(dose,'DICOMHeaders')
-                continue;
-            end
-            
-            % ======== TO DO: update for use without DICOMHeaders
-            info = dose.DICOMHeaders;
-            
-            vec1 = info.ImageOrientationPatient(1:3);
-            vec2 = info.ImageOrientationPatient(4:6);
-            vec3 = cross(vec1,vec2);
-            vec3 = vec3 * (info.GridFrameOffsetVector(2)-info.GridFrameOffsetVector(1));
-            pos1 = info.ImagePositionPatient;
-            
-            % positionMatrix translate voxel indexes to physical
-            % coordinates
-            dosePositionMatrix = [reshape(info.ImageOrientationPatient,[3 2])*diag(info.PixelSpacing) [vec3(1) pos1(1);vec3(2) pos1(2); vec3(3) pos1(3)]];
-            dosePositionMatrix = [dosePositionMatrix; 0 0 0 1];
-            
-            dosedim = size(dose.doseArray);
-            
-            % Need to figure out coord1OFFirstPoint,
-            % coord2OFFirstPoint, horizontalGridInterval,
-            % verticalGridInterval and zValues
-            
-            % 				xOffset = iPP(1) + (pixspac(1) * (nCols - 1) / 2);
-            % 				yOffset = iPP(2) + (pixspac(2) * (nRows - 1) / 2);
-            
-            vecs = [0 0 0 1; 1 1 0 1; (dosedim(2)-1)/2 (dosedim(1)-1)/2 0 1];
-            vecsout = (dosePositionMatrix*vecs'); % to physical coordinates
-            vecsout(1:3,:) = vecsout(1:3,:)/10;
-            vecsout = inv(positionMatrix) * vecsout;  % to MR image index (not dose voxel index)
-            vecsout = virPosMtx * vecsout; % to the virtual coordinates
-            
-            % 				dose.coord1OFFirstPoint = vecsout(1,3);
-            % 				dose.coord2OFFirstPoint = vecsout(2,3);
-            dose.coord1OFFirstPoint = vecsout(1,1);
-            dose.coord2OFFirstPoint = vecsout(2,1);
-            dose.horizontalGridInterval = vecsout(1,2) - vecsout(1,1);
-            dose.verticalGridInterval = vecsout(2,2) - vecsout(2,1);
-            
-            vecs = [zeros(2,dosedim(3));0:(dosedim(3)-1);ones(1,dosedim(3))];
-            vecsout = (dosePositionMatrix*vecs); % to physical coordinates
-            vecsout(1:3,:) = vecsout(1:3,:)/10;
-            vecsout = inv(positionMatrix) * vecsout;  % to MR image index (not dose voxel index)
-            vecsout = virPosMtx * vecsout; % to the virtual coordinates
-            
-            zValuesV = vecsout(3,:)'/10;
-            [zdoseV,zOrderV] = sort(zValuesV);
-            dose.zValues = zdoseV;
-            %[zdoseV,zOrderV] = sort(dose.zValues);
-            %dose.zValues = zdoseV;
-            
-            % Flip doseArray similar to the scanArray
-            % Flip scan since DICOM and CERR's z-convention is opposite.
-            % Hence sort according to descending z-values.
-            %[~,zOrderV] = sort(dose.zValues,'descend'); % flip dose
-            dose.doseArray = dose.doseArray(:,:,flip(zOrderV));
-            
-            planC{indexS.dose}(doseno) = dose;
+		for doseno = 1:N
+			try
+				dose = planC{indexS.dose}(doseno);
+				if ~isfield(dose,'DICOMHeaders')
+					continue;
+				end
+				
+				% ======== TO DO: update for use without DICOMHeaders
+				info = dose.DICOMHeaders;
+				
+				vec1 = info.ImageOrientationPatient(1:3);
+				vec2 = info.ImageOrientationPatient(4:6);
+				vec3 = cross(vec1,vec2);
+				vec3 = vec3 * (info.GridFrameOffsetVector(2)-info.GridFrameOffsetVector(1));
+				pos1 = info.ImagePositionPatient;
+				
+				% positionMatrix translate voxel indexes to physical
+				% coordinates
+				dosePositionMatrix = [reshape(info.ImageOrientationPatient,[3 2])*diag(info.PixelSpacing) [vec3(1) pos1(1);vec3(2) pos1(2); vec3(3) pos1(3)]];
+				dosePositionMatrix = [dosePositionMatrix; 0 0 0 1];
+				
+				dosedim = size(dose.doseArray);
+				
+				% Need to figure out coord1OFFirstPoint,
+				% coord2OFFirstPoint, horizontalGridInterval,
+				% verticalGridInterval and zValues
+				
+				% 				xOffset = iPP(1) + (pixspac(1) * (nCols - 1) / 2);
+				% 				yOffset = iPP(2) + (pixspac(2) * (nRows - 1) / 2);
+				
+				vecs = [0 0 0 1; 1 1 0 1; (dosedim(2)-1)/2 (dosedim(1)-1)/2 0 1];
+				vecsout = (dosePositionMatrix*vecs'); % to physical coordinates
+				vecsout(1:3,:) = vecsout(1:3,:)/10;
+				vecsout = inv(positionMatrix) * vecsout;  % to MR image index (not dose voxel index)
+				vecsout = virPosMtx * vecsout; % to the virtual coordinates
+				
+				% 				dose.coord1OFFirstPoint = vecsout(1,3);
+				% 				dose.coord2OFFirstPoint = vecsout(2,3);
+				dose.coord1OFFirstPoint = vecsout(1,1);
+				dose.coord2OFFirstPoint = vecsout(2,1);
+				dose.horizontalGridInterval = vecsout(1,2) - vecsout(1,1);
+				dose.verticalGridInterval = vecsout(2,2) - vecsout(2,1);
+				
+				vecs = [zeros(2,dosedim(3));0:(dosedim(3)-1);ones(1,dosedim(3))];
+				vecsout = (dosePositionMatrix*vecs); % to physical coordinates
+				vecsout(1:3,:) = vecsout(1:3,:)/10;
+				vecsout = inv(positionMatrix) * vecsout;  % to MR image index (not dose voxel index)
+				vecsout = virPosMtx * vecsout; % to the virtual coordinates
+				
+				zValuesV = vecsout(3,:)'/10;
+				[zdoseV,zOrderV] = sort(zValuesV);
+				dose.zValues = zdoseV;
+				%[zdoseV,zOrderV] = sort(dose.zValues);
+				%dose.zValues = zdoseV;
+				
+				% Flip doseArray similar to the scanArray
+				% Flip scan since DICOM and CERR's z-convention is opposite.
+				% Hence sort according to descending z-values.
+				%[~,zOrderV] = sort(dose.zValues,'descend'); % flip dose
+				dose.doseArray = dose.doseArray(:,:,flip(zOrderV));
+				
+				planC{indexS.dose}(doseno) = dose;
+			catch
+			end
         end
     end
         
@@ -399,6 +402,14 @@ for i=1:length(planC{indexS.structures})
         isObliqScanV, planC);
 end
 
-planC = getRasterSegs(planC);
-planC = setUniformizedData(planC);
+try
+	planC = getRasterSegs(planC);
+catch ME
+	warning(strcat("Error encountered while calling 'getRasterSegs(planC)': ", ME.message));
+end
+try
+	planC = setUniformizedData(planC);
+catch
+	warning(strcat("Error encountered while calling 'setUniformizedData(planC)': ", ME.message));
+end
 
