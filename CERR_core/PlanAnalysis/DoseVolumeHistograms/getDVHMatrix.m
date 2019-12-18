@@ -85,7 +85,10 @@ if isempty(volsHistV)
 
     %Store computational results if numBins is not specified
     if nargin ~=4
-        planC = saveDVHMatrix(DVHIndex, doseBinsV, volsHistV, planC);
+		try
+			planC = saveDVHMatrix(DVHIndex, doseBinsV, volsHistV, planC);
+		catch ME
+		end
     end
     
 end
