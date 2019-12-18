@@ -63,7 +63,7 @@ elseif strcmpi(userSelect, 'uncompress')
             del_dir_flag = 1;
         end
         if ispc
-            dos(['7z e ', fmat, ' -o"',tmpExtractDir,'"']);
+            dos(['7z e ', fmat, ' -o"',tmpExtractDir,'"', ' > nul']);
             %Remove temporary directory
             if del_dir_flag == 1                
                 rmdir(tmpExtractDir,'s')

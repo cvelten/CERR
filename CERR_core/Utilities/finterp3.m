@@ -71,7 +71,7 @@ if length(zFieldV) > 1;
     %25% faster compared to finterp1.
     indNaN = zInterpV < min(zFieldV) | zInterpV > max(zFieldV);
     zInterpV(indNaN) = zFieldV(1); %assign DUMMY value
-    [jnk,binIndex] = histc(zInterpV,zFieldV);
+    [jnk,binIndex] = histc(zInterpV,sort(zFieldV));
     yV = (1:length(zFieldV))';
     dxV = [diff(zFieldV) 1]'; %DUMMY 1
     zFieldTransposedV = zFieldV';

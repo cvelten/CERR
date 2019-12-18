@@ -33,6 +33,17 @@ function [xVals, yVals, zVals] = getDoseXYZVals(doseStruct)
 % 
 % You should have received a copy of the GNU General Public License
 % along with CERR.  If not, see <http://www.gnu.org/licenses/>.
+if doseStruct.horizontalGridInterval == 0 && doseStruct.verticalGridInterval == 0
+	doseStruct.horizontalGridInterval = 0.1;
+	doseStruct.verticalGridInterval = 0.1;
+end
+if doseStruct.horizontalGridInterval == 0
+	doseStruct.horizontalGridInterval = doseStruct.verticalGridInterval;
+end
+if doseStruct.verticalGridInterval == 0
+	doseStruct.verticalGridInterval = doseStruct.horizontalGridInterval;
+end
+
 xVals = doseStruct.coord1OFFirstPoint : doseStruct.horizontalGridInterval : (doseStruct.sizeOfDimension1-1)*doseStruct.horizontalGridInterval + doseStruct.coord1OFFirstPoint;
 yVals = doseStruct.coord2OFFirstPoint : doseStruct.verticalGridInterval : (doseStruct.sizeOfDimension2-1)*doseStruct.verticalGridInterval + doseStruct.coord2OFFirstPoint;
 zVals = doseStruct.zValues;

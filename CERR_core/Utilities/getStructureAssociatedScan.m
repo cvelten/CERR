@@ -67,7 +67,7 @@ assocScanUID = allAssocScanUID(structsV);
 % Match all the UID to check which scan the structure belongs too.
 %[jnk,assocScansV] = ismember(assocScanUID,scanUID);
 for strNum = 1:length(assocScanUID)
-    ind = find(strcmp(assocScanUID{strNum},scanUID));
+    ind = find(strcmp(assocScanUID{strNum},unique(scanUID)));
     if ~isempty(ind)
         assocScansV(strNum) = ind;
     else

@@ -131,7 +131,11 @@ for i = 1:length(structsV)
 
         slice = slicesV(j);
 
-        numSegs = length(planC{indexS.structures}(structNum).contour(slice).segments);
+		try
+	        numSegs = length(planC{indexS.structures}(structNum).contour(slice).segments);
+		catch
+			continue
+		end
 
         maskM = dummyM;
         % mask3M = [];
