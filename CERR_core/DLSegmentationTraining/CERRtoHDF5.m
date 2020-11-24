@@ -20,10 +20,12 @@ function errC = CERRtoHDF5(CERRdir,HDF5dir,userOptS)
 %AI 9/11/19 Updated for compatibility with testing pipeline
 %RKP 9/14/19 Additional updates for compatibility with testing pipeline
 %AI 9/18/19 Modularized
+%AI 9/18/20 Extended to handle multiple scans
 
 %% Get user inputs
 dataSplitV = userOptS.dataSplit;
 prefixType = userOptS.exportedFilePrefix;
+scanOptS = userOptS.scan;
 passedScanDim = userOptS.passedScanDim;
 if isfield(userOptS,'structList')
     strListC = userOptS.structList;
@@ -58,12 +60,13 @@ else
 end
 
 %Loop over CERR files
-dirS = dir(fullfile(CERRdir,filesep,'*.mat'));
+dirS = dir(fullfile(CERRdir,filesep,'*.mat')); 
+
 errC = {};
 
-for planNum = 1:length(dirS)
+parfor planNum = 1:length(dirS)
     
-    try
+     try
         
         %Load file
         fprintf('\nProcessing pt %d of %d...\n',planNum,length(dirS));
@@ -77,43 +80,27 @@ for planNum = 1:length(dirS)
         if ~ismember(planNum,testIdxV)
             testFlag = false;
         else
-            if isempty(strListC)
-                testFlag = true;
-            else
-                testFlag = false;
-            end
+            %if isempty(strListC)
+            % testFlag = true;
+            %else
+            % testFlag = false;
+            %end
+            testFlag = true;
         end
         [scanC, maskC] = extractAndPreprocessDataForDL(userOptS,planC,testFlag);
         
         %Export to HDF5
-        outDirC = {};
-        %- Get output directory
-        if length(userOptS.view)>1
-            viewC = userOptS.view;
-            for i=1:length(viewC)
-                outDirC{i} = fullfile(HDF5dir,viewC{i});
-            end
-        else
-            outDirC{1} = HDF5dir;
-            % to do: /Axial
-        end
         
+        %- Get split
         if ismember(planNum,trainIdxV)
-            outDirC = fullfile(outDirC,'Train');
+            split = 'Train';
         elseif ismember(planNum,valIdxV)
-            outDirC = fullfile(outDirC,'Val');
+            split = 'Val';
         else
             if dataSplitV(3)==100 %Testing only
-                %Do nothing
+                split = '';
             else
-                outDirC = fullfile(outDirC,'Test');
-            end
-        end
-        
-        %- Create output directories
-        for i =1:length(outDirC)
-            if ~exist(outDirC{i},'dir')
-                mkdir(outDirC{i});
+                split ='Test';
             end
         end
         
@@ -125,14 +112,33 @@ for planNum = 1:length(dirS)
         end
         
         %- Write to HDF5
-        writeHDF5ForDL(scanC,maskC,passedScanDim,outDirC,identifier,testFlag)
+        %Loop over scan types
+        for n = 1:size(scanC,1)
+            
+            %Append identifiers to o/p name
+            if length(scanOptS)>1
+                idS = scanOptS(n).identifier;
+                idListC = cellfun(@(x)(idS.(x)),fieldnames(idS),'un',0);
+                appendStr = strjoin(idListC,'_');
+                idOut = [identifier,'_',appendStr];
+            else
+                idOut = identifier;
+            end
+            
+            %Get o/p dirs & dim
+            outDirC = getOutputH5Dir(HDF5dir,scanOptS(n),split);
+
+            %Write to HDF5
+            writeHDF5ForDL(scanC{n},maskC{n},passedScanDim,outDirC,idOut,testFlag);
+            
+        end
         
-    catch e
-        
-        errC{planNum} =  ['Error processing pt %s. Failed with message: %s',fileNam,e.message];
-        
-    end
-    
+     catch e
+         
+         errC{planNum} =  ['Error processing pt %s. Failed with message: %s',fileNam,e.message];
+         
+     end
+     
 end
 
 if ~isempty(labelKeyS)

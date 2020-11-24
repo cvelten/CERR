@@ -50,10 +50,8 @@ end
 
 %Use a static window size, by pixels.  Do not allow resizing.
 screenSize = get(0,'ScreenSize');
-y = 380;
-x = 640;
-y = 480;
-x = 740;
+y = 650;
+x = 1000;
 units = 'normalized';
 
 %Height of a single row of text.
@@ -129,14 +127,13 @@ switch upper(command)
         
         % Default texture parameters
         scanNum = 1;
-        structNum = 1; 
+        structNum = 0; 
         featureNum = 1;
                 
         texturesC = {planC{indexS.texture}(:).description};        
-        
         % Populate values from an existing texture
         if textureNum > 0
-            set(ud.handles.texture, 'Value',textureNum);
+            set(ud.handles.texture, 'Value', textureNum);
             %set(ud.handles.texture, 'String', texturesC{textureNum});
             scanUID       = planC{indexS.texture}(textureNum).assocScanUID;
             scanNum       = getAssociatedScan(scanUID);
@@ -149,11 +146,12 @@ switch upper(command)
             category      = planC{indexS.texture}(textureNum).category;
             featC = get(ud.handles.featureType,'String');
             featureNum = find(strcmp(featC,category));
+            
             set(ud.handles.description,'string',texturesC{textureNum},'Enable','On');
         end
         
         set(ud.handles.scan, 'value', scanNum,'Enable','On');
-        set(ud.handles.structure, 'value', 1,'Enable','On');
+        set(ud.handles.structure, 'value',structNum+1,'Enable','On');
 
         
         set(ud.handles.featureType,'value',featureNum, 'Enable','On');
@@ -162,8 +160,6 @@ switch upper(command)
             'value',1)
         
         set(h, 'userdata', ud);
-        
-        textureGui('SCAN_SELECTED');
         
 %         if ~isempty(ud.currentTexture) && ud.currentTexture>0
 %             textureGui('FEATURE_TYPE_SELECTED');
@@ -212,11 +208,14 @@ switch upper(command)
         for i = 1:nStructs
             structsC{i+1} = [num2str(i), '.', planC{indexS.structures}(i).structureName];
         end
-        
+         
+         
         % List of feature types
         featureTypeC = {'Select',...
             'Haralick Cooccurance',...
             'Laws Convolution',...
+            'Laws Energy',...
+            'Mean',...
             'First Order Statistics',...
             'Wavelets',...
             'Gabor',...
@@ -250,18 +249,28 @@ switch upper(command)
         fieldWidth = .20;
         
         %Make text to describe uicontrols.
-        uicontrol(h, 'units',units,'Position',[txtLeft-0.02 1-.13 textWidth rowHeight],'String', 'Texture:', 'Style', 'text', 'horizontalAlignment', 'left', 'BackgroundColor', frameColor, 'fontSize',10,'fontWeight','Bold');
-        uicontrol(h, 'units',units,'Position',[txtLeft 1-.22 textWidth rowHeight],'String', 'Description:', 'Style', 'text', 'horizontalAlignment', 'left', 'BackgroundColor',frameColor,'fontSize',10);
-        uicontrol(h, 'units',units,'Position',[txtLeft 1-.29 textWidth rowHeight],'String', 'Scan:', 'Style', 'text', 'horizontalAlignment', 'left', 'BackgroundColor',frameColor,'fontSize',10);
-        uicontrol(h, 'units',units,'Position',[txtLeft 1-.36 textWidth rowHeight],'String', 'Structure:', 'Style', 'text', 'horizontalAlignment', 'left', 'BackgroundColor',frameColor,'fontSize',10);
-        uicontrol(h, 'units',units,'Position',[txtLeft 1-.43 textWidth rowHeight],'String', 'Category:', 'Style', 'text', 'horizontalAlignment', 'left', 'BackgroundColor',frameColor,'fontSize',10);
-        uicontrol(h, 'units',units,'Position',[txtLeft 1-.5 2*textWidth rowHeight],...
-            'String', 'Parameters:', 'Style', 'text','fontSize',13,'fontWeight','Bold',...
+        uicontrol(h, 'units',units,'Position',[txtLeft 1-.12 textWidth rowHeight-0.02],...
+            'String', 'Texture:', 'Style', 'text', 'horizontalAlignment', 'left',...
+            'BackgroundColor', frameColor, 'fontSize',12,'fontWeight','Bold');
+        uicontrol(h, 'units',units,'Position',[txtLeft 1-.20 textWidth rowHeight],...
+            'String', 'Description:', 'Style', 'text', 'horizontalAlignment',...
+            'left', 'BackgroundColor',frameColor,'fontSize',10);
+        uicontrol(h, 'units',units,'Position',[txtLeft 1-.27 textWidth rowHeight],...
+            'String', 'Scan:', 'Style', 'text', 'horizontalAlignment',...
+            'left', 'BackgroundColor',frameColor,'fontSize',10);
+        uicontrol(h, 'units',units,'Position',[txtLeft 1-.34 textWidth rowHeight],...
+            'String', 'Structure:', 'Style', 'text', 'horizontalAlignment',...
+            'left', 'BackgroundColor',frameColor,'fontSize',10);
+        uicontrol(h, 'units',units,'Position',[txtLeft 1-.41 textWidth rowHeight],...
+            'String', 'Category:', 'Style', 'text', 'horizontalAlignment',...
+            'left', 'BackgroundColor',frameColor,'fontSize',10);
+        uicontrol(h, 'units',units,'Position',[txtLeft 1-.47 2*textWidth rowHeight],...
+            'String', 'Parameters:', 'Style', 'text','fontSize',12,'fontWeight','Bold',...
             'horizontalAlignment', 'left', 'BackgroundColor', frameColor);
 
         
         %Make uicontrols for managing the scans, and displaying info.
-        structNum = 1;
+        structNum = 0; %default (none)
         if isfield(ud.handles,'description')
            desc = get(ud.handles.description,'String');
         else
@@ -273,30 +282,33 @@ switch upper(command)
         else
         texListC = {'   Click ''+'' to create  '};
         end
-        ud.handles.texture       = uicontrol(h, 'units',units,'Position',[fieldLeft-0.14 1-.12 fieldWidth+0.08 rowHeight-.01],'String',texListC, 'Style', 'popup', 'callback', 'textureGui(''TEXTURE_SELECTED'');', 'enable', 'on', 'horizontalAlignment', 'right','fontSize',10);
+        ud.handles.texture       = uicontrol(h, 'units',units,'Position',[fieldLeft-0.14 1-.12 fieldWidth+0.08 rowHeight-.015],'String',texListC, 'Style', 'popup', 'callback', 'textureGui(''TEXTURE_SELECTED'');', 'enable', 'on', 'horizontalAlignment', 'right','fontSize',10);
         ud.handles.textureAdd    = uicontrol(h, 'units',units,'Position',[2*fieldLeft-0.12 1-.12 0.03 rowHeight-.01],'String','+', 'Style', 'push', 'callback', 'textureGui(''CREATE_NEW_TEXTURE'');', 'horizontalAlignment', 'right','enable','on','fontSize',10);
         ud.handles.textureDel    = uicontrol(h, 'units',units,'Position',[2*fieldLeft-0.08 1-.12 0.03 rowHeight-.01],'String','-', 'Style', 'push', 'callback', 'textureGui(''DELETE_TEXTURE'');', 'horizontalAlignment', 'right','enable','on','fontSize',10);
         ud.handles.description   = uicontrol(h, 'units',units,'Position',...
-            [fieldLeft-.05 1-.22 fieldWidth+0.05 rowHeight],'String', desc,...
+            [fieldLeft-.05 1-.18 fieldWidth+0.05 rowHeight-0.02],'String', desc,...
             'Style', 'edit', 'horizontalAlignment', 'left', 'BackgroundColor',...
             'w','enable','off','callback',{@updateLabel,h},'fontSize',10);
         ud.handles.scan          = uicontrol(h, 'units',units,'Position',...
-            [fieldLeft-.05 1-.29 fieldWidth+0.05 rowHeight],'String', scansC,...
+            [fieldLeft-.05 1-.26 fieldWidth+0.05 rowHeight],'String', scansC,...
             'value', 1,  'Style', 'popup', 'horizontalAlignment', 'right',...
             'BackgroundColor', 'w','callback', 'textureGui(''SCAN_SELECTED'');',...
             'enable','off','fontSize',10);
         ud.handles.structure     = uicontrol(h, 'units',units,'Position',...
-            [fieldLeft-.05 1-.36 fieldWidth+.05 rowHeight],'String', structsC,...
+            [fieldLeft-.05 1-.33 fieldWidth+.05 rowHeight],'String', structsC,...
             'value', 1, 'Style', 'popup', 'horizontalAlignment', 'right',...
             'BackgroundColor', 'w','callback', 'textureGui(''STRUCT_SELECTED'');',...
             'enable','off','fontSize',10);
 
         ud.handles.featureType   = uicontrol(h, 'units',units,'Position',...
-            [fieldLeft-.05 1-.43 fieldWidth+.05 rowHeight],'String', featureTypeC,...
+            [fieldLeft-.05 1-.4 fieldWidth+.05 rowHeight],'String', featureTypeC,...
             'value', 1, 'Style', 'popup', 'callback',...
             'textureGui(''FEATURE_TYPE_SELECTED'');', 'horizontalAlignment',...
             'right', 'BackgroundColor', 'w', 'enable','off','fontSize',10);
-        ud.dXYZ                  = getVoxelSize(structNum,h);
+        
+        scanNum = get(ud.handles.scan,'value');
+        voxSizV = getScanXYZSpacing(scanNum,planC);
+        ud.dXYZ = voxSizV;
         
         % uicontrols to generate or delete texture maps
         ud.handles.createTextureMaps  = uicontrol(h, 'units',units,'Position',[0.03 1-.95 0.12 rowHeight],'String', 'Create Maps', 'Style', 'pushbutton', 'callback', 'textureGui(''CREATE_MAPS'');');
@@ -310,13 +322,20 @@ switch upper(command)
             [.85 .06 .12 rowHeight-0.02],'String', 'Send to MIM', 'Style',...
             'pushbutton', 'callback', 'textureGui(''SEND_MAPS_TO_MIM'');');
         
+        %Set default structNum
+        if ~isfield(ud,'structNum') || isempty(ud.structNum)
+            ud.structNum = 0;
+        end
+        
         set(h, 'userdata', ud);
         set(0, 'CurrentFigure', hFig);
 
         if ~isempty(ud.currentTexture) && ud.currentTexture>0
             textureGui('REFRESHFIELDS');
+            textureGui('SCAN_SELECTED');
             textureGui('REFRESH_THUMBS');
-        end        
+        end
+        textureGui('SCAN_SELECTED');
         
     case 'SCAN_SELECTED'
         ud = get(h, 'userdata');
@@ -331,7 +350,7 @@ switch upper(command)
         strNameC = strcat(cellfun(@num2str,num2cell(structNumV),...
             'UniformOutput',false),{'. '},strNameC);
         strNameC = [{'0. Entire Scan'},strNameC];
-        set(ud.handles.structure,'string',strNameC,'value',1)        
+        set(ud.handles.structure,'string',strNameC,'value',1)
         ud.structNumV   = [0,structNumV];
         set(h, 'userdata', ud);
         
@@ -339,8 +358,10 @@ switch upper(command)
     case 'STRUCT_SELECTED'
         ud = get(h, 'userdata');
         % structNum = get(ud.handles.structure,'value')-1;
-        ud.structNum = ud.structNumV(get(ud.handles.structure,'value'));        
-        ud.dXYZ   = getVoxelSize(ud.structNum,h);
+        ud.structNum = ud.structNumV(get(ud.handles.structure,'value'));
+        scanNum = get(ud.handles.scan,'value');
+        voxSizV = getScanXYZSpacing(scanNum,planC);
+        ud.dXYZ = voxSizV;
         set(h, 'userdata', ud);
        
     case 'PATCH_CM_SELECTED'
@@ -397,6 +418,7 @@ switch upper(command)
         if length(strC) == 1 && strcmpi(strC{1},'')
             return;
         end
+        %Update description
         ud.currentTexture = get(ud.handles.texture,'value');
         texC = get(ud.handles.texture,'String');
         if iscell(texC)
@@ -404,7 +426,16 @@ switch upper(command)
         else
          set(ud.handles.description,'string',texC);
         end
+        %Update assoc. structure name
+        assocStructUID = {planC{indexS.texture}(ud.currentTexture).assocStructUID};
+        strIdx = getAssociatedStr(assocStructUID);
+        if isempty(strIdx)
+            set(ud.handles.structure,'Value',1); %entire scan
+        else
+            set(ud.handles.structure,'Value',strIdx);
+        end
         set(h, 'userdata', ud);
+        %Update displayed parameters
         paramS = planC{indexS.texture}(ud.currentTexture).parameters;
         fType = planC{indexS.texture}(ud.currentTexture).category;
         textureGui('FEATURE_TYPE_SELECTED',paramS,fType);
@@ -436,16 +467,16 @@ switch upper(command)
         else
             featListC = get(featH,'string');
             featureType = featListC{featureIdx};
-            featureType = strrep(featureType,' ','');
+            %featureType = strrep(featureType,' ','');
             paramS = [];
         end
         startPosV = get(featH,'position');
-        delPos = .07;
+        delPos = .055;
         
         
         if nargin== 1 %List parameters for new texture map
         switch featureType
-            case 'HaralickCooccurance' 
+            case 'Haralick Cooccurance' 
                 
                 paramC = {'Type','PatchSize','PatchType','Directionality','NumLevels'};
                 typeC = {'popup','edit' ,'popup','popup','edit'};
@@ -462,61 +493,78 @@ switch upper(command)
                     {'16'}};
                 dispC = {'On','On','On','On','On'};
                 
-            case 'LawsConvolution' % Laws 
-                paramC = {'Direction','KernelSize'};
-                typeC = {'popup','popup'};
-                valC = {{'2D','3D', 'All'},{'3','5','All'}};
-                dispC = {'On','On'};
-            
-            case 'FirstOrderStatistics' %First-order statistics
-                paramC = {'PatchSize','VoxelVolume'};
+            case 'Laws Convolution' % Laws 
+                paramC = {'PadMethod','PadSize','Direction','Type','Normalize'};
+                typeC = {'popup','edit','popup','edit','popup'};
+                valC = {{'expand','padzeros','periodic','nearest',...
+                    'mirror','none'},{'2,2,2'},{'2D','3D', 'All'},...
+                    {'E5L5S5'},{'Yes','No'}};
+                dispC = {'On','On','On','On','On'};
+                
+            case 'Laws Energy' %Laws energy
+                paramC = {'PadMethod','PadSize','Direction','Type',...
+                          'KernelSize','Normalize'};
+                typeC = {'popup','edit','popup','edit','edit','popup'};
+                valC = {{'expand','padzeros','periodic','nearest',...
+                    'mirror','none'},{'2,2,2'},{'2D','3D', 'All'},...
+                    {'E5L5S5'},'5,5,5',{'Yes','No'}};
+                dispC = {'On','On','On','On','On', 'On'};
+                
+            case 'Mean' % Local mean filter
+                paramC = {'PadMethod', 'PadSize','KernelSize'};
+                typeC = {'popup','edit','edit'};
+                valC = {{'expand','padzeros','periodic','nearest',...
+                    'mirror','none'},{'5,5,5'},{'3,3,3'}};
+                dispC = {'On','On','On'};
+                
+            case 'First Order Statistics' %First-order statistics
+                paramC = {'PatchSize','VoxelSize_mm'};
                 typeC = {'edit','edit'};
-                [xUnifV, yUnifV, zUnifV] = getUniformScanXYZVals(planC{indexS.scan}(scanNum));
-                PixelSpacingXi = abs(xUnifV(2)-xUnifV(1));
-                PixelSpacingYi = abs(yUnifV(2)-yUnifV(1));
-                PixelSpacingZi = abs(zUnifV(2)-zUnifV(1));
-                VoxelVol = PixelSpacingXi*PixelSpacingYi*PixelSpacingZi;
-                valC = {'3,3,3',VoxelVol};
+                voxSizeV = getScanXYZSpacing(scanNum,planC);
+                voxSizeV = voxSizeV.*10; % convert cm to mm
+                valC = {'3,3,3',voxSizeV};
                 dispC = {'On','Off'};
+                
 
             case 'Wavelets'
-                paramC = {'Direction','Wavelets','Index'};
-                typeC = {'popup','popup','popup'};
-                valC = {{'All','HHH','LHH','HLH','HHL','LLH','LHL','HLL','LLL'},...
+                paramC = {'PadMethod','PadSize','Normalize','Direction',...
+                    'Wavelets','Index'};
+                typeC = {'popup','edit','popup','popup','popup','popup'};
+                valC = {{'expand','padzeros','periodic','nearest',...
+                    'mirror','none'},{'5,5,5'},{'Yes','No'},{'All','HHH',...
+                    'LHH','HLH','HHL','LLH','LHL','HLL','LLL'},...
                     {'Daubechies','Haar','Coiflets','FejerKorovkin','Symlets',...
-                    'Discrete Meyer wavelet','Biorthogonal','Reverse Biorthogonal'},@getSubParameter};
-                dispC = {'On','On','On','Off'};
+                    'Discrete Meyer wavelet','Biorthogonal','Reverse Biorthogonal'},...
+                    @getSubParameter};
+                dispC = {'On','On','On','On','On','On','Off'};
                 subTypeC = {{'Index','Wavelets'}};
                 
             case 'Gabor'
-                paramC = {'Radius','Sigma','AspectRatio','Orientation','Wavlength'};
-                typeC = {'edit','edit','edit','edit','edit'};
-                valC = {3,.5,1,30,1};
-                dispC = {'On','On','On','On','On'};
+                paramC = {'PadMethod','PadSize','Radius','Sigma',...
+                    'AspectRatio','Orientation','Wavlength'};
+                typeC = {'popup','edit','edit','edit','edit','edit','edit'};
+                valC = {{'expand','padzeros','periodic','nearest',...
+                    'mirror','none'},{'5,5,5'},3,.5,1,30,1};
+                dispC = {'On','On','On','On','On','On','On'};
                 
-%             case 'LoG'
-%                 paramC = {'KernelSize','Sigma'};
-%                 typeC = {'edit','edit'};
-%                 valC = {3,.5};
-%                 dispC = {'On','On'};
                 
             case 'LoG'
-                paramC = {'VoxelSize_mm','Sigma_mm'};
-                typeC = {'edit','edit'};
-                dy = planC{indexS.scan}(scanNum).scanInfo(1).grid1Units;
-                dx = planC{indexS.scan}(scanNum).scanInfo(1).grid2Units;
-                dz = planC{indexS.scan}(scanNum).scanInfo(2).zValue - ...
-                    planC{indexS.scan}(scanNum).scanInfo(1).zValue;
-                dx = abs(dx);
-                dy = abs(dy);
-                dz = abs(dz);
-                voxSizeV = [dy, dx, dz]*10; % convert cm to mm
-                valC = {voxSizeV,.5};
+                paramC = {'PadMethod','PadSize','Sigma_mm','VoxelSize_mm'};
+                typeC = {'popup','edit','edit','edit'};
                 
-                dispC = {'off','On'};
+                voxSizeV = getScanXYZSpacing(scanNum,planC);
+                voxSizeV = voxSizeV.*10; % convert cm to mm
+                valC = {{'expand','padzeros','periodic','nearest',...
+                    'mirror','none'},{'5,5,5'},.5,voxSizeV};
+                dispC = {'On','On','On','off'};
 
             case 'Sobel'
-                paramC = {};
+                paramC = {'PadMethod', 'PadSize'};
+                typeC = {'popup','edit'};
+                valC = {{'expand','padzeros','periodic','nearest',...
+                    'mirror','none'},{'5,5,5'}};
+                dispC = {'On','On','off','On'};
+
                 
             case 'CoLlage'
                 paramC = {'Dimension','Dominant_Dir_Radius','Cooccur_Radius','Number_Gray_Levels'};
@@ -700,8 +748,13 @@ switch upper(command)
                 stateS.scanStats.Colormap.(scanUID) = 'weather';
                 % strNum = get(ud.handles.structure,'value')-1; %Get current structure
                 strNum = ud.structNum;
-                rasterSegments = getRasterSegments(strNum, planC);
-                slicesV = unique(rasterSegments(:, 6)); 
+                if strNum==0
+                    slicesV = 1:size(getScanArray(ud.currentScan,planC),3);
+                    
+                else
+                    rasterSegments = getRasterSegments(strNum, planC);
+                    slicesV = unique(rasterSegments(:, 6));
+                end
                 midSlice = floor((length(slicesV)+1)/2); %Get middle slice
                 [~, ~, zs] = getScanXYZVals(planC{indexS.scan}(varargin{1}));
                 newCoord = zs(midSlice);
@@ -769,11 +822,11 @@ switch upper(command)
         set(ud.handles.featureType,'Value',1);
         %Clear any previous parameter controls
         if isfield(ud.handles,'paramControls')
-        hPar = ud.handles.paramControls;
-        hPar.delete;
+            hPar = ud.handles.paramControls;
+            hPar.delete;
         end
         set(h, 'userdata',ud);
-        %textureGui('REFRESHFIELDS');
+        textureGui('SCAN_SELECTED');
         
         
     case 'DELETE_TEXTURE'
@@ -786,36 +839,48 @@ switch upper(command)
         
         
     case 'CREATE_MAPS'
+        
         ud          = get(h, 'userdata');
         set(ud.handles.createTextureMaps,'enable','off'); %Disable while computing texture maps
         scanNum     = get(ud.handles.scan, 'value');
-        % structNum   = get(ud.handles.structure, 'value')-1;
         structNum = ud.structNum;
+        
         hwait = ud.wb.handles.patch;
         indexS = planC{end};
         
         paramS = ud.parameters;
         fType = ud.filtType;
         label =  get(ud.handles.description,'String');
+        
+        %Get scan array
         scan3M = getScanArray(scanNum,planC);
         CTOffset = planC{indexS.scan}(scanNum).scanInfo(1).CTOffset;
         scan3M = double(scan3M) - CTOffset;
         
-
+        %Get structure mask
         fullMask3M = scan3M.^0;
         if ~(structNum==0)
-            fullMask3M = false(size(scan3M));
-            [rasterSegments, planC, isError] = getRasterSegments(structNum,planC);
-            [mask3M,uniqueSlicesV]  = rasterToMask(rasterSegments, scanNum, planC);
-            fullMask3M(:,:,uniqueSlicesV) = mask3M;
-            [minr, maxr, minc, maxc, ~, ~] = compute_boundingbox(fullMask3M);
+            fullMask3M = getStrMask(structNum,planC);
+            [minr,maxr,minc,maxc] = compute_boundingbox(fullMask3M);
+            uniqueSlicesV = find(sum(sum(fullMask3M))>0);
         else
             uniqueSlicesV = 1:size(scan3M,3);
             minc = 1;
-            maxr = 1;
+            maxc = size(scan3M,2);
+            minr = 1;
+            maxr = size(scan3M,1);
         end
         
-        %Evaluate
+        %Crop around mask, followed by padding as specified
+        if ~isfield(paramS,'PadMethod')
+            [procScan3M,procMask3M] = padScan(scan3M,fullMask3M,...
+                'none',0);
+        else
+            [procScan3M,procMask3M] = padScan(scan3M,fullMask3M,...
+                paramS.PadMethod.val,paramS.PadSize.val);
+        end
+        
+        %Map user-selections to labels
         if(strcmp(fType,'Wavelets') )
             mappedWavFamilyC = {'db','haar','coif', 'fk','sym','dmey','bior','rbio'};
             wavFamilyC = {'Daubechies','Haar','Coiflets','FejerKorovkin','Symlets',...
@@ -825,8 +890,11 @@ switch upper(command)
             [~,idx] = find(isWav);
             out = mappedWavFamilyC{idx};
             paramS.Wavelets.val = out;
+            if length(paramS.Index.val)>1
+                paramS.Index.val = paramS.Index.val{1};
+            end
             
-        elseif (strcmp(fType,'HaralickCooccurance') )
+        elseif (strcmp(fType,'Haralick Cooccurance') )
             mappedDirectionalityC = {1,2,3,4,5,6};
             directionalityC = {'Co-occurance with 13 directions in 3D',...
                 'Left-Right, Ant-Post and Diagonals in 2D', ...
@@ -841,49 +909,53 @@ switch upper(command)
             paramS.Directionality.val = out;
             
             if strcmpi(paramS.PatchType.val,'cm')
-            [xVals, yVals, zVals] = getUniformScanXYZVals(planC{indexS.scan}(scanNum));
-            deltaX = abs(xVals(1)-xVals(2));
-            deltaY = abs(yVals(1)-yVals(2));
-            deltaZ = abs(zVals(1)-zVals(2));
-            patchSizeV = paramS.PatchSize.val;
-            slcWindow = floor(patchSizeV(3)/deltaZ);
-            rowWindow = floor(patchSizeV(1)/deltaY);
-            colWindow = floor(patchSizeV(2)/deltaX);
-            patchSizeV = [rowWindow, colWindow, slcWindow];
-            paramS.PatchSize.val = patchSizeV;
+                [xVals, yVals, zVals] = getUniformScanXYZVals(planC{indexS.scan}(scanNum));
+                deltaX = abs(xVals(1)-xVals(2));
+                deltaY = abs(yVals(1)-yVals(2));
+                deltaZ = abs(zVals(1)-zVals(2));
+                patchSizeV = paramS.PatchSize.val;
+                slcWindow = floor(patchSizeV(3)/deltaZ);
+                rowWindow = floor(patchSizeV(1)/deltaY);
+                colWindow = floor(patchSizeV(2)/deltaX);
+                patchSizeV = [rowWindow, colWindow, slcWindow];
+                paramS.PatchSize.val = patchSizeV;
             end
                 
-        elseif (strcmp(fType,'LawsConvolution') )
+        elseif (strcmp(fType,'Laws Convolution') )
+            
             mappedDirC = {1,2,3};
-            mappedSizC = {1,2,3};
+            mappedPadMethodC = {1,2,3,4,5,6};
+            
             dirC = {'2D','3D', 'All'};
-            sizC = {'3','5','All'};
+            padMethodC = {'expand','padzeros','periodic','nearest',...
+                    'mirror','none'};
+                
             idx1 = paramS.Direction.val;
-            idx2 = paramS.KernelSize.val;
+            idx2 = paramS.PadMethod.val;
             isDir = cellfun(@(x)isequal(x,idx1),dirC);
-            isSiz = cellfun(@(x)isequal(x,idx2),sizC);
+            isPadMethod = cellfun(@(x)isequal(x,idx2),padMethodC);
             [~,idx1] = find(isDir);
-            [~,idx2] = find(isSiz);
+            [~,idx2] = find(isPadMethod);
             out1 = mappedDirC{idx1};
-            out2 = mappedSizC{idx2};
+            out2 = mappedPadMethodC{idx2};
             paramS.Direction.val = out1;
-            paramS.KernelSize.val = out2;
+            paramS.PadMethod.val = out2;
+
+            elseif (strcmp(fType,'LoG'))
             
-            
-            
-        end
-        outS = processImage(fType,scan3M,fullMask3M,paramS,hwait);
-        featuresC = fieldnames(outS);
-        %Extract filtered image within bounding box (for thumbnails)
-        [minr, maxr, minc, maxc, mins, maxs] = compute_boundingbox(fullMask3M);
-        fieldNamC = fieldnames(outS);
-        for i = 1:length(fieldNamC)
-            tempImg3M = outS.(fieldNamC{i});
-            tempImg3M(~fullMask3M) = NaN;
-            tempImg3M = tempImg3M(minr:maxr,minc:maxc,mins:maxs);
-            outS.(fieldNamC{i}) = tempImg3M;
+            mappedPadMethodC = {1,2,3,4,5,6};
+            padMethodC = {'expand','padzeros','periodic','nearest',...
+                'mirror','none'};
+            idx = paramS.PadMethod.val;
+            isPadMethod = cellfun(@(x)isequal(x,idx),padMethodC);
+            [~,idx] = find(isPadMethod);
+            out = mappedPadMethodC{idx};
+            paramS.PadMethod.val = out;
         end
         
+        %Apply filter
+        outS = processImage(fType,procScan3M,procMask3M,paramS,hwait);
+    
         % Create new Texture if ud.currentTexture = 0
         if ud.currentTexture == 0
             initTextureS = initializeCERR('texture');
@@ -906,27 +978,25 @@ switch upper(command)
         planC{indexS.texture}(ud.currentTexture).description = label;
         planC{indexS.texture}(ud.currentTexture).textureUID = createUID('TEXTURE');
         
-        
-         
         % Create Texture Scans
         [xVals, yVals, zVals] = getScanXYZVals(planC{indexS.scan}(scanNum));
         deltaXYZv = ud.dXYZ;
         zV = zVals(uniqueSlicesV);
         regParamsS.horizontalGridInterval = deltaXYZv(1);
-        regParamsS.verticalGridInterval   = deltaXYZv(2); %(-)ve for dose
-        regParamsS.coord1OFFirstPoint   = xVals(minc);
-        %         %regParamsS.coord2OFFirstPoint   = yVals(minr); % for dose
+        regParamsS.verticalGridInterval = deltaXYZv(2); 
+        regParamsS.coord1OFFirstPoint = xVals(minc);
         regParamsS.coord2OFFirstPoint   = yVals(maxr);
-%         regParamsS.coord1OFFirstPoint   = planC{indexS.scan}(scanNum).scanInfo(1).xOffset;
-%         regParamsS.coord2OFFirstPoint   = planC{indexS.scan}(scanNum).scanInfo(1).yOffset;
         
         regParamsS.zValues  = zV;
         regParamsS.sliceThickness =[planC{indexS.scan}(scanNum).scanInfo(uniqueSlicesV).sliceThickness];
         
         assocTextureUID = planC{indexS.texture}(ud.currentTexture).textureUID;
-       
+        
+        %Save to planC
+        featuresC = fieldnames(outS);
         for n = 1:length(featuresC)
-            planC = scan2CERR(outS.(featuresC{n}),featuresC{n},'Passed',regParamsS,assocTextureUID,planC);
+            feat3M = outS.(featuresC{n});
+            planC = scan2CERR(feat3M,featuresC{n},'Passed',regParamsS,assocTextureUID,planC);
         end 
         
         set(ud.handles.createTextureMaps,'enable','on'); 
@@ -1350,21 +1420,36 @@ end
 
 %Create thumbnail
 %strNum = ud.handles.structure.Value - 1;
+% if isfield(ud,'structNum')
+%     strNum = ud.structNum;
+% else
+%     ud.structNum = 0;
+%     strNum = 0;
+% end
 strNum = ud.structNum;
+
 if strNum==0 %Entire scan
     firstROISlice = 1;
 else
     rasterSegments = getRasterSegments(strNum, planC);
     firstROISlice = min(unique(rasterSegments(:,6)));
 end
+
+
 thumbSlice = min(s,numel(sV));
 % thumbSlice = thumbSlice + firstROISlice - 1;
 thumbSlice = max(1,thumbSlice);
 %endSlice = numel(sV)+ firstROISlice - 1;
 endSlice = numel(sV);
 thumbImage = dA(:,:,thumbSlice);
-thumbImage = imgaussfilt(thumbImage,2); %Display smoothed thumbnail
-imagesc(thumbImage, 'hittest', 'off', 'parent', hAxis);
+thumbImage = imgaussfilt(thumbImage,.5); %Display smoothed thumbnail
+% Set window level & width
+thumbMin = min(dA(:));
+thumbMax = max(dA(:));
+winLevel = (thumbMin + thumbMax) / 2;
+winWidth = thumbMax - thumbMin;
+cLim = [winLevel-winWidth/2,winLevel+winWidth/2];
+imagesc(thumbImage,'hittest', 'off', 'parent', hAxis, cLim);
 colormap(hAxis, ud.cM);
 
 %Display scan name
@@ -1406,8 +1491,10 @@ yLim = get(hAxis, 'ylim');
 x = (xLim(2) - xLim(1)) * .05 + xLim(1);
 y = (yLim(2) - yLim(1)) * .15 + yLim(1);
 y2 = (yLim(2) - yLim(1)) * .2 + yLim(1);
-text(x, y, scanType, 'fontsize', 9, 'color', 'k', 'hittest', 'off', 'parent', hAxis);
-text(x, y2, slNum, 'fontsize', 9, 'color', 'k', 'hittest', 'off', 'parent', hAxis); %added
+text(x, y, scanType, 'fontsize', 9, 'fontweight', 'bold', 'color', 'k',...
+    'hittest', 'off', 'parent', hAxis);
+text(x, y2, slNum, 'fontsize', 9, 'fontweight', 'bold', 'color', 'k',...
+    'hittest', 'off', 'parent', hAxis); %added
 
 %--- For radiomics paper---
 % text(x, y, scanType, 'fontsize', 11, 'fontweight', 'bold', 'color', 'k', 'hittest', 'off', 'parent', hAxis);
@@ -1473,23 +1560,6 @@ for i=1:length(stateS.handle.CERRAxis)
     
 end
 
-
-function dXYZ = getVoxelSize(structNum,hFig)
-global planC
-indexS = planC{end};
-if structNum==0
-    ud = get(hFig,'userdata');
-    scanNum = get(ud.handles.scan,'value');
-else
-scanNum = getStructureAssociatedScan(structNum);
-end
-[xV,yV,zV] = getScanXYZVals(planC{indexS.scan}(scanNum));
-dx = abs(mean(diff(xV)));
-dy = abs(mean(diff(yV)));
-dz = abs(mean(diff(zV)));
-dXYZ = [dy dx dz];
-
-
     function outS = addParam(outS,fieldname,type,val,disp,pos,hFigure)
         
         %Update disctionary
@@ -1500,7 +1570,10 @@ dXYZ = [dy dx dz];
                 in = in{1};
             end
             if ~isnumeric(in)
-                in = str2num(in);   
+                temp = str2num(in);
+                if ~isempty(temp)
+                    in = temp;
+                end
             end
             outS.(fieldname).val = in;
         elseif strcmp(type,'popup')
@@ -1521,7 +1594,7 @@ dXYZ = [dy dx dz];
         textWidth = .2;
         fieldLeft = .22;
         fieldWidth = .25;
-        rowHeight = 0.06;
+        rowHeight = 0.04;
         
         hPar(end+1) = uicontrol(hFigure,'units','normalized','Visible',disp,...
             'Position',[txtLeft pos textWidth rowHeight],'Style','Text','String',fieldname,...

@@ -1,4 +1,4 @@
-function [mask3MU, xV, yV, zV] = getStructSurface(structNum,planC)
+function [mask3MU, xV, yV, zV, planC] = getStructSurface(structNum,planC)
 %Assemble the 3-D CT-registered mask of structure surface points (type UINT8),
 %along with the x, y, and z coordinates of the surface points.
 %JOD.
@@ -71,7 +71,7 @@ for sliceNum = 2 : numSlices - 1
     for j = 1 : size(segments2M,1)
       maskM(segments2M(j,7),segments2M(j,8):segments2M(j,9)) = 1;
       tmpV = segments2M(j,:);
-      x0V = tmpV(3): tmpV(5) : tmpV(4);
+      x0V = tmpV(3): tmpV(5)-eps : tmpV(4);
       len = length(x0V);
       rangeV = ones(1,len);
       y0V = tmpV(2) * rangeV;

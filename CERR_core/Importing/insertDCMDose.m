@@ -38,6 +38,7 @@ if ~exist('dcmFileName','var')
     dcmFileName = fullfile(dirName,fileName);
 end
 
+dcmInitFlag = init_ML_DICOM;
 [dcmObj, isDcm] = scanfile_mldcm(dcmFileName);
 dcmdirS = [];
 if isDcm
@@ -47,7 +48,12 @@ else
     error('Invalid DICOM data')
 end
 
-dataS = populate_planC_field('dose', dcmdirS.PATIENT);
+% Read options file
+pathStr = getCERRPath;
+optName = [pathStr 'CERROptions.json'];
+optS = opts4Exe(optName);
+
+dataS = populate_planC_field('dose', dcmdirS.PATIENT,optS);
 
 if ~isempty(planC{indexS.dose})
     planC{indexS.dose} = dissimilarInsert(planC{indexS.dose},dataS,length(planC{indexS.dose})+1);

@@ -1,4 +1,4 @@
-function outMask3M = getMaskForModelConfig(planC,mask3M,scanNum,cropS)
+function [outMask3M, planC] = getMaskForModelConfig(planC,mask3M,scanNum,cropS)
 % getMaskForModelConfig.m
 % Create mask for deep learning based on input configuration file.
 %
@@ -55,7 +55,7 @@ for m = 1:length(methodC)
             strC = {planC{indexS.structures}.structureName};
             strIdx = getMatchingIndex(strName,strC,'EXACT');
             if ~isempty(strIdx)
-                outMask3M = getStrMask(strIdx,planC);
+                [outMask3M, planC] = getStrMask(strIdx,planC);
             else
                 warning(['Missing structure ', strName]); 
                 outMask3M = false(size(getScanArray(scanNum,planC)));
@@ -90,8 +90,9 @@ for m = 1:length(methodC)
             structureName = paramS.structureName;
             outThreshold = paramS.outlineThreshold;            
             indexS = planC{end};            
-            outlineIndex = getMatchingIndex(structureName,{planC{indexS.structures}.structureName},'exact');
-            
+            outlineIndex = getMatchingIndex(structureName,...
+                {planC{indexS.structures}.structureName},'exact');
+
             if isempty(outlineIndex)
                 scan3M = getScanArray(scanNum,planC);
                 CToffset = planC{indexS.scan}(scanNum).scanInfo(1).CTOffset;
@@ -101,7 +102,7 @@ for m = 1:length(methodC)
                 outMask3M = getPatientOutline(scan3M,sliceV,outThreshold);
                 maskC{m} = outMask3M;
             else
-                maskC{m} = getStrMask(outlineIndex,planC);
+                [maskC{m}, planC] = getStrMask(outlineIndex,planC);
             end
             
         case 'crop_shoulders'
@@ -109,8 +110,8 @@ for m = 1:length(methodC)
             % Use pt_outline structure generated in "crop_pt_outline" case
             indexS = planC{end};
             strName = paramS.structureName;
-            strNum = getStructNum(strName,planC,indexS);
-            pt_outline_mask3M = getStrMask(strNum,planC);
+            strNum = getMatchingIndex(strName,{planC{indexS.structures}.structureName},'exact');
+            [pt_outline_mask3M, planC] = getStrMask(strNum,planC);
             
             % generate mask after cropping shoulder slices
             outMask3M = cropShoulder(pt_outline_mask3M,planC);
@@ -134,10 +135,7 @@ for m = 1:length(methodC)
             
         otherwise
             %Custom crop function
-            maskC{m} = feval(method,planC,paramS,mask3M,scanNum);
-            if paramS.saveStrToPlanCFlag
-                planC = maskToCERRStructure(maskC{m}, 0, scanNum, method,planC);
-            end
+            [maskC{m},planC] = feval(method,planC,paramS,mask3M,scanNum);
     end
     
     %Save to planC if reqd
@@ -167,7 +165,3 @@ end
 outMask3M = maskC{end};
 
 end
-
-
-
-

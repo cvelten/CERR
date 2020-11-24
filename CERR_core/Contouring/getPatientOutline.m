@@ -1,18 +1,19 @@
-function ptMask3M = getPatientOutline(scan3M,slicesV,outThreshold,minMaskSiz)
+function connPtMask3M = getPatientOutline(scan3M,slicesV,outThreshold,minMaskSiz)
 % Returns mask of patient's outline
 %
 % Usage:
 % global planC
+% scanNum = 1;
 % indexS = planC{end};
 % scan3M = getScanArray(scanNum,planC);
 % CToffset = planC{indexS.scan}(scanNum).scanInfo(1).CTOffset;
-% scan3M = scan3M - CToffset;
-% ptMask3M = getPatientOutline(scan3M); %Returns mask for all slices by default
+% scan3M = double(scan3M) - CToffset;
+% ptMask3M = getPatientOutline(scan3M,1:size(scan3M,3),0); %Returns mask for all slices by default
 %
 % AI 7/13/19
 
-
-if ~exist('slicesV','var')
+%% Set default values
+if ~exist('slicesV','var') || isempty(slicesV)
     slicesV = 1:size(scan3M,3);
 end
 
@@ -20,110 +21,76 @@ if ~exist('minMaskSiz','var')
     minMaskSiz = 1500;
 end
 
-%Compute threshold
+%% Mask out couch
+couchStartIdx = getCouchLocationHough(scan3M);
+
+sizV = size(scan3M);
+couchMaskM = false(sizV(1),sizV(2));
+couchMaskM(couchStartIdx:end,:) = true;
+
+%% Mask out air
+
+% Compute threshold
 scanThreshV = scan3M(scan3M>outThreshold);
 threshold = prctile(scanThreshV,5);
-sizV = size(scan3M);
-imageCenterRow = sizV(1)/2;
+minInt = min(scan3M(:));
 
-%% Extract mask
-minMaskSiz = 1500;
-minDistV = nan([numel(slicesV),1]);
-idxC = cell(1,numel(slicesV));
+%Iterate over slices
+ptMask3M = false([sizV(1:2),length(slicesV)]);
 for n = 1:numel(slicesV)
     
-    %Threshold image
-    y = scan3M(:,:,slicesV(n))>threshold;
-    y = imdilate(y,strel('disk',4,8));
-    y = imfill(y,'holes');
+    % Threshold image
+    sliceM = scan3M(:,:,slicesV(n));
+    threshM = sliceM>threshold;
     
-    %Identify largest connected component
-    cc = bwconncomp(y);
-    ccSiz = cellfun(@numel,[cc.PixelIdxList]);
-    %sel = ccSiz==max(ccSiz);
+    % Mask out couch
+    binM = threshM & ~couchMaskM;
     
-    %Exclude masks with fewer voxels than minMaskSiz 
-    selV = find(ccSiz > minMaskSiz);
+    % Separate pt outline from table
+    binM = imopen(binM,strel('disk',5));
     
-    %Record distance of centroid of largest CC from image center
-    if ~isempty(selV)
+    % Fill holes in pt outline
+    maskM = false(size(binM));
+    if any(binM(:))
         
-        rowMedianV = nan(1,length(selV));
-        for iSel = 1:length(selV)
-            [rV,~] = ind2sub(size(y),cc.PixelIdxList{selV(iSel)});
-            rowMedianV(iSel) = median(rV);
+        %Identify largest connected component
+        ccS = bwconncomp(binM);
+        ccSiz = cellfun(@numel,[ccS.PixelIdxList]);
+        [maxCompSiz,largestCompIdx] = max(ccSiz);
+        
+        %Retain if > minMaskSiz
+        if maxCompSiz >= minMaskSiz
+            
+            idxV = ccS.PixelIdxList{largestCompIdx};
+            maskM(idxV) = true;
+            
+            % Fill holes
+            [keepIdxV,rowMaxV] = max(flipud(maskM));
+            rowMaxIdx = size(binM,1) - min(rowMaxV(keepIdxV));
+            sliceM(rowMaxIdx:end,:) = minInt;
+            thresh2M = sliceM > 1.5*threshold;
+            thresh2M = imfill(thresh2M,'holes');
+            thresh2M = bwareaopen(thresh2M,200,8);
+            thresh2M = imclose(thresh2M,strel('disk',3));
+            smoothedlabel3M = imboxfilt(double(thresh2M),5);
+            maskM = smoothedlabel3M > 0.5;
+            
         end
-        distV = (rowMedianV - imageCenterRow).^2;
-        [minDistV(n),indMin] = min(distV);
-        sel = selV(indMin);
         
-        %Record pixel indices of largest CC
-        idxC{n} = cc.PixelIdxList{sel};
     end
     
-end
-
-
-%If distance of row centroid of largest CC from image center is too large, 
-%it is excluded
-
-%- Compute mean & std deviation of distances of row centroids from image 
-%center for all slices
-globalMedianDist = nanmedian(minDistV); 
-distDev = nanstd(minDistV,1);
-%distDev = 50;
-
-%- Filter slices if they deviate too much from image center
-ptMask3M = false(size(scan3M));
-for n = 1:numel(slicesV)
+    ptMask3M(:,:,slicesV(n)) = maskM;
     
-    maskM = false(size(y));
-
-    %Check if deviation is within one std dev from global mean 
-    if abs(minDistV(n)-globalMedianDist) < distDev  
-        maskM(idxC{n}) = true;
-    %If largest CC is far from centroid, use mask from previous slice
-    elseif n >1
-        maskM = ptMask3M(:,:,slicesV(n-1));
-    end
-    
-    ptMask3M(:,:,slicesV(n)) = maskM;    
 end
 
-%--- Use finterp in future----
-% %Fill in mask on missing slices
-% maskSlicesV = squeeze(sum(sum(ptMask3M))>0);
-% mins = find(maskSlicesV,1,'first');
-% maxs = find(maskSlicesV,1,'last');
-% maskSlicesV = mins : maxs;
-% 
-% missingIdxV = squeeze(sum(sum(ptMask3M(:,:,maskSlicesV)))==0);
-% missingSlicesV = maskSlicesV(missingIdxV);
-% 
-% for n = 1:length(missingSlicesV)
-%     
-%     prevMaskM  = ptMask3M(:,:,missingSlicesV(n)-1);
-%     nextMaskM = ptMask3M(:,:,missingSlicesV(n)+1);
-%     
-%     if sum(prevMaskM(:))==0
-%         maskM = nextMaskM;
-%     elseif sum(nextMaskM(:))==0
-%         maskM = prevMaskM;
-%     else
-%         maskM = prevMaskM | nextMaskM;
-%     end
-%     
-%     ptMask3M(:,:,missingSlicesV(n)) = maskM;
-%     
-% end
+%% 3D connected component filter
+connPtMask3M = false(size(ptMask3M));
+ccS = bwconncomp(ptMask3M,26);
+ccSiz = cellfun(@numel,[ccS.PixelIdxList]);
+[~,largestCompIdx] = max(ccSiz);
+idxV = ccS.PixelIdxList{largestCompIdx};
+connPtMask3M(idxV) = true;
 
-%% Morphological post-processing
-ptMask3M = imfill(ptMask3M,26,'holes');
-%Fuse disjointed segments
-for n = 1:size(ptMask3M,3)
-    labelM = double(ptMask3M(:,:,n));
-    labelM = imclose(labelM,strel('disk',4));
-    ptMask3M(:,:,n) = labelM;
-end
+
 
 end

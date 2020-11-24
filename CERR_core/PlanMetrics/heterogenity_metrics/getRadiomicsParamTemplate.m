@@ -48,11 +48,14 @@ if isfield(userInS,'settings')
     ivhParamS = struct;
     
     % Structure names
-    radiomicsParamS.structuresC = userInS.structures;
+    if isfield(userInS,'structures')
+        radiomicsParamS.structuresC = userInS.structures;
+    end
+    %Otherwise, use entire scan
     
     % ---1. First-order features ---
     idx = strcmpi(settingsC,'firstOrder');
-    if ~isempty(idx)
+    if any(idx)
         paramC = fieldnames(userInS.settings.(settingsC{idx}));
         for k = 1: length(paramC)
             firstOrderParamS.(paramC{k}) = userInS.settings.(settingsC{idx}).(paramC{k});
@@ -62,7 +65,7 @@ if isfield(userInS,'settings')
     
     %---2. Shape features ----
     idx = strcmpi(settingsC,'shape');
-    if ~isempty(idx)
+    if any(idx)
         paramC = fieldnames(userInS.settings.(settingsC{idx}));
         for k = 1: length(paramC)
             shapeParamS.(paramC{k}) = userInS.settings.(settingsC{idx}).(paramC{k});
@@ -72,7 +75,7 @@ if isfield(userInS,'settings')
     
     %---3. Higher-order (texture) features ----
     idx = strcmpi(settingsC,'texture');
-    if ~isempty(idx)
+    if any(idx)
         paramC = fieldnames(userInS.settings.(settingsC{idx}));
         for k = 1: length(paramC)
             textureParamS.(paramC{k}) = userInS.settings.(settingsC{idx}).(paramC{k});
@@ -82,7 +85,7 @@ if isfield(userInS,'settings')
     
     %---4. Peak-valley features ----
     idx = strcmpi(settingsC,'peakvalley');
-    if ~isempty(idx)
+    if any(idx)
         paramC = fieldnames(userInS.settings.(settingsC{idx}));
         for k = 1: length(paramC)
             peakValleyParamS.(paramC{k}) = userInS.settings.(settingsC{idx}).(paramC{k});
@@ -92,7 +95,7 @@ if isfield(userInS,'settings')
     
     %---5. IVH features ----
     idx = strcmpi(settingsC,'ivh');
-    if ~isempty(idx)
+    if any(idx)
         paramC = fieldnames(userInS.settings.(settingsC{idx}));
         for k = 1: length(paramC)
             ivhParamS.(paramC{k}) = userInS.settings.(settingsC{idx}).(paramC{k});
@@ -102,8 +105,9 @@ if isfield(userInS,'settings')
     
     
     %% Set flags for sub-classes of features to be extracted
-    whichFeatS = struct('resample',struct('flag',0),'perturbation',struct('flag',0),...
-        'firstOrder',struct('flag',0),'shape',struct('flag',0),'texture',struct('flag',0),...
+    whichFeatS = struct('resample',struct('flag',0), 'padding',struct('flag',0),...
+        'perturbation',struct('flag',0),'firstOrder',struct('flag',0),...
+        'shape',struct('flag',0),'texture',struct('flag',0),...
         'peakValley',struct('flag',0),'ivh',struct('flag',0),'glcm',struct('flag',0),...
         'glrlm',struct('flag',0),'gtdm',struct('flag',0),'gldm',struct('flag',0),...
         'glszm',struct('flag',0));
@@ -134,6 +138,8 @@ if isfield(userInS,'featureClass')
     
     %% Flag to quantize input data
     radiomicsParamS.toQuantizeFlag = 1;
+else
+    radiomicsParamS.whichFeatS = whichFeatS;
 end
 
 feature accel on

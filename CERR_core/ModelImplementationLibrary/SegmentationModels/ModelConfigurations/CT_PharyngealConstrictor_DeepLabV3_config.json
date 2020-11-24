@@ -1,0 +1,46 @@
+{
+"strNameToLabelMap":[
+
+  {"structureName" : "Constrictor_muscle", "value" : 1}
+
+  ],
+
+"inputFileType" : "CERR",
+
+"scan":{
+
+        "identifier" : {"imageType": "CT SCAN"},
+
+	"view" : ["axial", "sagittal", "coronal"],
+
+	"crop" : [{     
+            		"method": "crop_for_constrictor",
+            		"params": { "structureName": 
+            		             { 
+                         	     "larynx": "Larynx_DLabV3",
+                                     "cropStructure": "crop_for_larynx"
+                        	     },
+                        	     "saveStrToPlanCFlag": 0
+                  		   },
+            		"operator": ""
+                  }
+         ],
+
+	"resize" : {"method": "none",
+            	    "size" : [320,320]},
+
+	"channels" :[{"imageType": "original", "slice": "current-1"},
+             	     {"imageType": "original", "slice": "current"},
+            	     {"imageType": "original", "slice": "current+1"}]
+             
+},
+             
+"passedScanDim" : "2D",
+
+"batchSize" : 4,
+
+"postProc" : {"Constrictor_muscle": [{"method": "post_process_constrictor"}]},
+
+"reference" : "https://www.biorxiv.org/content/10.1101/772178v1"
+
+}

@@ -87,7 +87,12 @@ switch tag
         
     case 2097207    %0020,0037 Image Orientation (Patient)
         
-        data = scanInfoS.imageOrientationPatient;
+        switch type
+            case 'scan'
+                data = scanInfoS.imageOrientationPatient;
+            case 'dose'
+                data = doseS.imageOrientationPatient;
+        end        
         el = data2dcmElement(template, data, tag);
         
     case 2097202    %0020,0032 Image Position (Patient) (mm)
@@ -100,31 +105,58 @@ switch tag
                     xV = scanInfoS.xOffset - ((scanInfoS.sizeOfDimension2-1)*scanInfoS.grid2Units)/2;
                     yV = scanInfoS.yOffset + ((scanInfoS.sizeOfDimension1-1)*scanInfoS.grid2Units)/2;
                     zV = scanInfoS.zValue;
-                    posV = convertCoordinates([xV,yV,zV], ptPos);
+                    imgOri = scanInfoS.imageOrientationPatient;
+                    posV = convertCoordinates([xV,yV,zV], imgOri);
                     %Convert from CERR cm to DICOM mm.
                     posV = posV * 10;
                 end
                 
             case 'dose'
-                xV = doseS.coord1OFFirstPoint;
-                yV = doseS.coord2OFFirstPoint;
-                zV = -doseS.zValues(end); %?
-                coord3M = [xV, yV, zV];
-                posV = convertCoordinates(coord3M, ptPos);
-                %Convert from CERR cm to DICOM mm.
-                posV = posV * 10;
+                posV = doseS.imagePositionPatient;
+                if isempty(posV) %non-dicom
+                    xV = doseS.coord1OFFirstPoint;
+                    yV = doseS.coord2OFFirstPoint;
+                    zV = doseS.zValues(end); %?
+                    coord3M = [xV, yV, zV];
+                    imgOri = doseS.imageOrientationPatient;
+                    posV = convertCoordinates(coord3M, imgOri);
+                    %Convert from CERR cm to DICOM mm.
+                    posV = posV * 10;
+                end
         end
         
         data = posV;
         el = data2dcmElement(template, data, tag);
         
-        %Class 2 Tags -- Must be present, can be blank.
+        %Class 1C tag -- conditionally required.
         
-    case 1572944    %0018,0050 Slice Thickness (mm)
+    case 2625616 %0028,1050 Window Center
         switch type
             case 'scan'
-                data = scanInfoS.sliceThickness;
-            case 'dose'
+                data = scanInfoS.windowCenter;
+            otherwise
+                data = [];
+        end
+        el = data2dcmElement(template, data, tag);
+
+        
+    case 2625617 %0028,1050 Window Width
+        switch type
+            case 'scan'
+                data = scanInfoS.windowWidth;
+            otherwise
+                data = [];
+        end
+        el = data2dcmElement(template, data, tag);
+
+
+%Class 2 Tags -- Must be present, can be blank.
+
+case 1572944    %0018,0050 Slice Thickness (mm)
+    switch type
+        case 'scan'
+            data = scanInfoS.sliceThickness;
+        case 'dose'
                 firstZ = doseS.zValues(1);
                 lastZ  = doseS.zValues(end);
                 numZ   = length(doseS.zValues);

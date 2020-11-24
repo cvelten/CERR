@@ -104,7 +104,8 @@ switch upper(instr)
         
         if ~exist('planC','var') || (exist('planC','var')  && isempty(planC))
             %Check java version and add DCM4CHE libraries to Matlab path
-            dcm_init_flag = init_ML_DICOM;
+            %dcm_init_flag = init_ML_DICOM;
+            dcm_init_flag = 1; %mod for octave compatibility
         else
             dcm_init_flag = 0;
         end
@@ -120,6 +121,8 @@ switch upper(instr)
         stateS.toggle_rotation = 0;
         stateS.webtrev.isOn = 0;
         stateS.currentKeyPress = 0;
+        
+        stateS.imageFusion.lockMoving = 1; % 1:lock, 0:unlock
         
         %Store Matlab version under stateS
         stateS.MLVersion = getMLVersion;
@@ -206,10 +209,15 @@ switch upper(instr)
 
         str1 = ['CERR'];
         position = [5 40 940 620];
+        %--- temp for octave compatibility---
+        %hCSV = figure('tag','CERRSliceViewer','name',str1,'numbertitle','off',...
+        %    'position',position, 'doublebuffer', 'off','CloseRequestFcn',...
+        %    'sliceCallBack(''closeRequest'')','backingstore','off','tag',...
+        %   'CERRSliceViewer', 'renderer', 'zbuffer');
         hCSV = figure('tag','CERRSliceViewer','name',str1,'numbertitle','off',...
             'position',position, 'doublebuffer', 'off','CloseRequestFcn',...
-            'sliceCallBack(''closeRequest'')','backingstore','off','tag',...
-            'CERRSliceViewer', 'renderer', 'zbuffer');
+            'sliceCallBack(''closeRequest'')','tag',...
+            'CERRSliceViewer');
                 
         figureColor = get(hCSV, 'Color');
         stateS.handle.CERRSliceViewer = hCSV;
@@ -285,9 +293,9 @@ switch upper(instr)
         uicontrol(hCSV,'units','pixels','BackgroundColor',uicolor,'Position',[(frameWidth-50)/2+10+15 510 (frameWidth-50)/2 25], 'String','Width','Style','text', 'enable', 'inactive' ,'Tag','CTWindow','ForegroundColor',[0.1 0.4 0.1]);
 
         %Presets dropdown.
-        stateS.handle.CTPreset = uicontrol(hCSV,'units','pixels', 'BackgroundColor',uicolor,'Position',[20 540 (frameWidth-30)/2 25], 'String',{stateS.optS.windowPresets.name},'Style','popup','Tag','CTPreset', 'callback','sliceCallBack(''CTPreset'');','tooltipstring','Select Preset Window');
+        stateS.handle.CTPreset = uicontrol(hCSV,'units','pixels', 'BackgroundColor',uicolor,'Position',[20 540 (frameWidth-30)/2 25], 'String',{stateS.optS.windowPresets.name},'Style','popupmenu','Tag','CTPreset', 'callback','sliceCallBack(''CTPreset'');','tooltipstring','Select Preset Window');
         %Base Colormap Presets dropdown.
-        stateS.handle.BaseCMap = uicontrol(hCSV,'units','pixels', 'BackgroundColor',uicolor,'Position',[(frameWidth-30)/2+20+10 540 (frameWidth-30)/2 25], 'String',{stateS.optS.scanColorMap.name},'Style','popup','Tag','CMapPreset', 'callback','sliceCallBack(''BaseColorMap'');','tooltipstring','Select Scan Color Map','Enable','on');
+        stateS.handle.BaseCMap = uicontrol(hCSV,'units','pixels', 'BackgroundColor',uicolor,'Position',[(frameWidth-30)/2+20+10 540 (frameWidth-30)/2 25], 'String',{stateS.optS.scanColorMap.name},'Style','popupmenu','Tag','CMapPreset', 'callback','sliceCallBack(''BaseColorMap'');','tooltipstring','Select Scan Color Map','Enable','on');
         %CTLevel edit box
         stateS.handle.CTLevel = uicontrol(hCSV,'units','pixels', 'BackgroundColor',uicolor,'Position',[20 500 (frameWidth-50)/2 20], 'String',num2str(stateS.optS.CTLevel),'Style','edit','Tag','CTLevel', 'callback','sliceCallBack(''CTLevel'');','tooltipstring','Change CT window center');
         %CT Width edit box.
@@ -308,15 +316,17 @@ switch upper(instr)
         if isdeployed
             [I,map] = imread(fullfile(getCERRPath,'pics','Icons','tool_zoom.gif'),'gif');
         else
-            [I,map] = imread('tool_zoom.gif','gif');
+        %    [I,map] = imread('tool_zoom.gif','gif');
+             [I,map] = imread(fullfile(getCERRPath,'Icons','tool_zoom.gif'),'gif');
         end
         zoomImg = ind2rgb(I,map);
         stateS.handle.zoom = uicontrol(hCSV,'units',units,'style', 'togglebutton', 'position',[0.018*512+dx, 345, dx - 35, 20]/512,'cdata',zoomImg,'BackgroundColor',uicolor, 'callback','sliceCallBack(''togglezoom'')','interruptible','on','tooltipstring', 'Toggle ZoomIn(Left)/ZoomOut(Right)');
 
         if isdeployed
-            [I,map] = imread(fullfile(getCERRPath,'pics','Icons','reset_zoom.GIF'),'gif');
+            [I,map] = imread(fullfile(getCERRPath,'pics','Icons','reset_zoom.gif'),'gif');
         else
-            [I,map] = imread('reset_zoom.GIF','gif');
+            %[I,map] = imread('reset_zoom.GIF','gif');
+            [I,map] = imread(fullfile(getCERRPath,'Icons','reset_zoom.gif'),'gif');
         end
         resetZoomImg = ind2rgb(I,map);
         stateS.handle.resetZoom = uicontrol(hCSV,'units',units,'style', 'PushButton', 'position',[0.018*512+dx*1.4, 345, dx - 35, 20]/512,'cdata',resetZoomImg,'BackgroundColor',uicolor, 'callback','sliceCallBack(''ZOOMRESET'')','interruptible','on','tooltipstring', 'Reset Zoom to Original');
@@ -325,8 +335,8 @@ switch upper(instr)
         %   stateS.handle.zoomOutTrans = uicontrol(hCSV,'units',units,'pos',[0.018*512, 345 dx - 10, 20]/512,'string','Zoom out','fontsize',fontsize, 'BackgroundColor',uicolor, 'callback','sliceCallBack(''zoomout'')','interruptible','on','tooltipstring','Zoom out by factor optS.zoomFactor');
 
         %Temporary next/prev slice buttons.
-        stateS.handle.buttonUp = uicontrol(hCSV,'units',units,'style', 'pushbutton', 'pos',[0.018*512, 345 dx/2-10, 20]/512,'string','S+','fontsize',fontsize, 'BackgroundColor',uicolor, 'callback','sliceCallBack(''ChangeSlc'',''nextslice'')','interruptible','on');
-        stateS.handle.buttonDwn = uicontrol(hCSV,'units',units,'style', 'pushbutton', 'pos',[0.018*512+dx*0.4, 345 dx/2-10, 20]/512,'string','S-','fontsize',fontsize, 'BackgroundColor',uicolor, 'callback','sliceCallBack(''ChangeSlc'',''prevslice'')','interruptible','on');
+        stateS.handle.buttonUp = uicontrol(hCSV,'units',units,'style', 'pushbutton', 'position',[0.018*512, 345 dx/2-10, 20]/512,'string','S+','fontsize',fontsize, 'BackgroundColor',uicolor, 'callback','sliceCallBack(''ChangeSlc'',''nextslice'')','interruptible','on');
+        stateS.handle.buttonDwn = uicontrol(hCSV,'units',units,'style', 'pushbutton', 'position',[0.018*512+dx*0.4, 345 dx/2-10, 20]/512,'string','S-','fontsize',fontsize, 'BackgroundColor',uicolor, 'callback','sliceCallBack(''ChangeSlc'',''prevslice'')','interruptible','on');
 
         % Capture Button on CERR
         %[I,map] = imread('capture.GIF','gif');
@@ -447,7 +457,7 @@ switch upper(instr)
 
         %Populate bottom margin Gui Objects.
         %Command line editbox.
-        stateS.handle.commandLine = uicontrol(hCSV,'units',units,'BackgroundColor',[1 1 1], 'pos',[145 30 90 18]/512, 'String','help','Style','edit','Tag','command', 'callback','sliceCallBack(''command'');','horizontalalignment','left');
+        stateS.handle.commandLine = uicontrol(hCSV,'units',units,'BackgroundColor',[1 1 1], 'position',[145 30 90 18]/512, 'String','help','Style','edit','Tag','command', 'callback','sliceCallBack(''command'');','horizontalalignment','left');
         hCmd = uicontrol(hCSV,'units',units,'Position',[110 25 30 20]/512,'Style','text', 'enable', 'inactive'  ,'String','Command:', 'horizontalAlignment', 'left', 'Backgroundcolor', figureColor);
         set([stateS.handle.commandLine, hCmd], 'units', 'pixels');
 
@@ -480,7 +490,13 @@ switch upper(instr)
         stateS.handle.deepLearnSegFig = [];
         
         % Initialize list of structures available on current views
-        stateS.structsOnViews = [];                
+        stateS.structsOnViews = [];    
+        
+        % Initialize spotlight handles
+        stateS.handle.spotLightS = [];
+        
+        % Initialize rotation handles
+        stateS.handle.rotationS = [];
         
         %Change Panel-Layout according to CERROptions
         sliceCallBack('layout',stateS.optS.layout)
@@ -498,7 +514,7 @@ switch upper(instr)
         indexS = planC{end};
         
         % Quality assure
-        quality_assure_planC
+        quality_assure_planC;
 
         %Set Patient-Name string
         patName = planC{indexS.scan}(1).scanInfo(1).patientName;
@@ -512,14 +528,7 @@ switch upper(instr)
         try
             delete(findobj('Tag','CERR_splashAxis'));
         end
-        stateS.doseSet              = [];
-        structIndx = getStructureSetAssociatedScan(1);
-        if ~isempty(structIndx)
-            stateS.structSet = structIndx;
-        else
-            stateS.structSet = [];
-        end
-
+        
         %Check for remotely stored variables
         flag = checkAndSetRemotePath;
         if flag
@@ -570,6 +579,8 @@ switch upper(instr)
         stateS.doseSetChanged       = 1;
         stateS.doseDisplayChanged   = 1;
         stateS.CTDisplayChanged     = 1;
+        stateS.colorbarRange        = [];
+        stateS.doseDisplayRange     = [];        
         stateS.doseChanged          = 1;
         stateS.structsChanged       = 1;
         
@@ -580,6 +591,23 @@ switch upper(instr)
         stateS.imageRegistrationMovDatasetType = 'scan';
         stateS.showPlaneLocators = 1;
         stateS.showNavMontage = 0;
+        
+        structureSet = getStructureSetAssociatedScan(stateS.scanSet);
+
+        if isempty(structureSet)
+            stateS.structSet = [];
+        else
+            stateS.structSet = structureSet(1);
+        end
+
+        doseNum = getScanAssociatedDose(stateS.scanSet);
+
+        if isempty(doseNum)
+            stateS.doseSet = [];
+        else
+            stateS.doseSet = doseNum;
+            %stateS.doseSetChanged = 1;
+        end        
         
         if ~(stateS.planLoaded && stateS.layout == 8)
             
@@ -788,7 +816,7 @@ switch upper(instr)
         updateScanColorbar(stateS.scanSet);
         
         %If any duplicates, remove them and make new entry first.
-        if any(strcmpi(stateS.planHistory, stateS.CERRFile));
+        if any(strcmpi(stateS.planHistory, stateS.CERRFile))
             ind = find(strcmpi(stateS.planHistory, stateS.CERRFile));
             stateS.planHistory(ind) = [];
         end
@@ -800,7 +828,7 @@ switch upper(instr)
         try
             %Save functions... modified to work with matlab 7
             saveOpt = getSaveInfo;
-            if ~isempty(saveOpt);
+            if ~isempty(saveOpt)
                 save(fullfile(getCERRPath, 'planHistory'), 'planHistory', saveOpt);
             else
                 save(fullfile(getCERRPath, 'planHistory'), 'planHistory');
@@ -812,26 +840,38 @@ switch upper(instr)
                
         % Set Window and Width from DICOM header, if available
         for scanNum = 1:length(planC{indexS.scan})
-            if isfield(planC{indexS.scan}(scanNum).scanInfo(1),'DICOMHeaders')...
-                    && isfield(planC{indexS.scan}(scanNum).scanInfo(1).DICOMHeaders,'WindowCenter')...
-                    && isfield(planC{indexS.scan}(scanNum).scanInfo(1).DICOMHeaders,'WindowWidth')
-                CTLevel = planC{indexS.scan}(scanNum).scanInfo(1).DICOMHeaders.WindowCenter(end);
-                CTWidth = planC{indexS.scan}(scanNum).scanInfo(1).DICOMHeaders.WindowWidth(end);
+            if ~isempty(planC{indexS.scan}(scanNum).scanInfo(1).windowCenter)...
+                    && ~isempty(planC{indexS.scan}(scanNum).scanInfo(1).windowWidth)
+                CTLevel = planC{indexS.scan}(scanNum).scanInfo(1).windowCenter(end);
+                CTWidth = planC{indexS.scan}(scanNum).scanInfo(1).windowWidth(end);
                 scanUID = ['c',repSpaceHyp(planC{indexS.scan}(scanNum).scanUID(max(1,end-61):end))];
                 stateS.scanStats.CTLevel.(scanUID) = CTLevel;
                 stateS.scanStats.CTWidth.(scanUID) = CTWidth;
-        %%%%%%%%% ADDED AI 1/10/16 : Scaling window center/width for Philips display %%%%%
-                if strfind(lower(planC{indexS.scan}(scanNum).scanInfo(1).scannerType),'philips')...
-                   & ~isempty(planC{indexS.scan}(scanNum).scanInfo(1).rescaleSlope)...
-                   & ~isempty(planC{indexS.scan}(scanNum).scanInfo(1).scaleSlope)
-                    rescaleSlope = planC{indexS.scan}(scanNum).scanInfo(1).rescaleSlope;
-                    scaleSlope = planC{indexS.scan}(scanNum).scanInfo(1).scaleSlope;
-                    scanUID = ['c',repSpaceHyp(planC{indexS.scan}(scanNum).scanUID(max(1,end-61):end))];
-                    stateS.scanStats.CTLevel.(scanUID) = stateS.scanStats.CTLevel.(scanUID)/(rescaleSlope*scaleSlope);
-                    stateS.scanStats.CTWidth.(scanUID) = stateS.scanStats.CTWidth.(scanUID)/(rescaleSlope*scaleSlope);
-                end
+                %%%%%%%%% ADDED AI 1/10/16 : Scaling window center/width for Philips display %%%%%
+                %if strfind(lower(planC{indexS.scan}(scanNum).scanInfo(1).scannerType),'philips')...
+                %        && ~isempty(planC{indexS.scan}(scanNum).scanInfo(1).rescaleSlope)...
+                %        && ~isempty(planC{indexS.scan}(scanNum).scanInfo(1).scaleSlope)
+                %    rescaleSlope = planC{indexS.scan}(scanNum).scanInfo(1).rescaleSlope;
+                %    scaleSlope = planC{indexS.scan}(scanNum).scanInfo(1).scaleSlope;
+                %    scanUID = ['c',repSpaceHyp(planC{indexS.scan}(scanNum).scanUID(max(1,end-61):end))];
+                %    stateS.scanStats.CTLevel.(scanUID) = stateS.scanStats.CTLevel.(scanUID)/(rescaleSlope*scaleSlope);
+                %    stateS.scanStats.CTWidth.(scanUID) = stateS.scanStats.CTWidth.(scanUID)/(rescaleSlope*scaleSlope);
+                %end
             end
         end
+        % Update Level, Width and Colormap
+        scanUID = ['c',repSpaceHyp(planC{indexS.scan}(stateS.scanSet).scanUID(max(1,end-61):end))];
+        CTLevel = stateS.scanStats.CTLevel.(scanUID);
+        CTWidth = stateS.scanStats.CTWidth.(scanUID);
+        windowPreset = stateS.scanStats.windowPresets.(scanUID);
+        scanColormap = stateS.scanStats.Colormap.(scanUID);
+        colorC = get(stateS.handle.BaseCMap,'string');
+        baseMapVal = find(~cellfun(@isempty,strfind(colorC,scanColormap)));        
+        set(stateS.handle.CTLevel,'string',num2str(CTLevel))
+        set(stateS.handle.CTWidth,'string',num2str(CTWidth))
+        set(stateS.handle.CTPreset,'value',windowPreset)
+        set(stateS.handle.BaseCMap,'value',baseMapVal)
+        updateScanColorbar(stateS.scanSet)
         %%%%%%%%%%%%%%%%%%%% End added %%%%%%%%%%%%%
         
         %Update status string
@@ -1520,8 +1560,8 @@ switch upper(instr)
             
             % Update Center, Width and Colormap strings on the GUI
             set(stateS.handle.CTPreset, 'Value', stateS.scanStats.windowPresets.(scanUID));
-            set(stateS.handle.CTLevel, 'String', stateS.scanStats.CTLevel.(scanUID));
-            set(stateS.handle.CTWidth, 'String', stateS.scanStats.CTWidth.(scanUID));
+            set(stateS.handle.CTLevel, 'String', num2str(stateS.scanStats.CTLevel.(scanUID)));
+            set(stateS.handle.CTWidth, 'String', num2str(stateS.scanStats.CTWidth.(scanUID)));
             ind = find(strcmpi({stateS.optS.scanColorMap.name},stateS.scanStats.Colormap.(scanUID)));
             set(stateS.handle.BaseCMap,'value',ind);
             
@@ -1916,11 +1956,12 @@ switch upper(instr)
             end
             lockImg = ind2rgb(I,map);
             set(gcbo,'cdata',lockImg,'fontWeight','bold','foregroundColor', [1 0 0]);
+            set(stateS.handle.CERRAxis,'buttondownfcn', 'sliceCallBack(''axisClicked'')')
         else 
             if isdeployed
-                [I,map] = imread(fullfile(getCERRPath,'pics','Icons','unlock.GIF'),'gif');
+                [I,map] = imread(fullfile(getCERRPath,'pics','Icons','unlock.gif'),'gif');
             else
-                [I,map] = imread('unlock.GIF','gif');
+                [I,map] = imread('unlock.gif','gif');
             end
             lockImg = ind2rgb(I,map);
             set(gcbo,'cdata',lockImg,'fontWeight','bold','foregroundColor',[0.5 0.5 0.5]);
@@ -2841,81 +2882,306 @@ switch upper(instr)
         %%%%%
         
     case 'TOGGLESPOTLIGHT' 
+        spotLightS = stateS.handle.spotLightS;
+        if isfield(spotLightS,'base_spotlight_xcrosshair') && ...
+                ~isempty(spotLightS.base_spotlight_xcrosshair) && ...
+                ishandle(spotLightS.base_spotlight_xcrosshair)
+            delete(spotLightS.base_spotlight_xcrosshair)
+            delete(spotLightS.base_spotlight_ycrosshair)
+        end
+        if isfield(spotLightS,'mov_spotlight_xcrosshair') && ...
+                ~isempty(spotLightS.mov_spotlight_xcrosshair) && ...
+                ishandle(spotLightS.mov_spotlight_xcrosshair)
+            delete(spotLightS.mov_spotlight_xcrosshair)
+            delete(spotLightS.mov_spotlight_ycrosshair)
+        end
+        spotLightS.base_spotlight_xcrosshair = [];
+        spotLightS.base_spotlight_ycrosshair = [];
+        spotLightS.mov_spotlight_xcrosshair = [];
+        spotLightS.base_spotlight_ycrosshair = [];
+        
         if stateS.spotlightState
             stateS.spotlightState = 0;
         else
             stateS.spotlightState = 1;
         end
         if stateS.spotlightState
+            
+            deformS = planC{indexS.deform}(end);
+            scanUIDc = {planC{indexS.scan}.scanUID};
+            baseUID = deformS.baseScanUID;
+            movUID = deformS.movScanUID;
+            baseScanNum = find(strcmpi(baseUID,scanUIDc));
+            movScanNum = find(strcmpi(movUID,scanUIDc));
+            % Assume last scan is the deformed indices
+            indScanNum = length(planC{indexS.scan});
+
+            spotLightS.baseScanNum = baseScanNum;
+            spotLightS.movScanNum = movScanNum;
+            spotLightS.indScanNum = indScanNum;            
+
+            % Change panel layout to 2 medium
+            sliceCallBack('layout', 3)
+
+            % Link the three views and display Transverse view on the three axes
+            Ax1 = stateS.handle.CERRAxis(1);
+            Ax2 = stateS.handle.CERRAxis(2);
+            
+            spotLightS.baseAxis = Ax1;
+            spotLightS.movAxis = Ax2;
+
+            setAxisInfo(Ax1,'scanSelectMode','manual','structSelectMode','manual',...
+                'doseSelectMode','manual','scanSets',spotLightS.baseScanNum,'structureSets',[],'doseSets',[],...
+                'view','transverse','xRange',[],'yRange',[])
+            setAxisInfo(Ax2,'scanSelectMode','manual','structSelectMode','manual',...
+                'doseSelectMode','manual','scanSets',spotLightS.movScanNum,'structureSets',[],'doseSets',[],...
+                'view','transverse','xRange',[],'yRange',[])
+
+            %Set coord at the starting slice of strNum1
+            [xBaseV,yBaseV,zBaseV] = getScanXYZVals(planC{indexS.scan}(spotLightS.baseScanNum));
+            [xMovV,yMovV,zMovV] = getScanXYZVals(planC{indexS.scan}(spotLightS.movScanNum));
+            setAxisInfo(Ax1,'coord',median(zBaseV),...
+                'xRange',[xBaseV(1) xBaseV(end)],...
+            'yRange',[yBaseV(end) yBaseV(1)])
+            setAxisInfo(Ax2,'coord',median(zMovV),...
+                'xRange',[xMovV(1) xMovV(end)],...
+            'yRange',[yMovV(end) yMovV(1)])
+        
+            stateS.CTChanged = 1;
+            stateS.doseChanged = 1;
+            stateS.doseDisplayChanged = 1;
+            CERRRefresh
+            
             toggleOffDrawModes;
-            CERRStatusString('Click/drag in axis. Right click to end.');
+            CERRStatusString('Click in axis. Right click to end.');
             %stateS.spotlightState = 1;
             %Disable all right click menus;
             set(stateS.handle.CERRAxis, 'uicontextmenu', []);
+            
+            stateS.handle.spotLightS = spotLightS;
+                        
         else
             CERRStatusString('');
-            delete([findobj('tag', 'spotlight_patch'); findobj('tag', 'spotlight_xcrosshair'); findobj('tag', 'spotlight_ycrosshair')]);            
+            %delete([findobj('tag', 'spotlight_patch'); findobj('tag', 'spotlight_xcrosshair'); findobj('tag', 'spotlight_ycrosshair')]);            
         end        
         
         
     case 'SPOTLIGHTSTART'
-        hAxis = gcbo;
+       
+%         hAxis = gcbo;
+%         cP = get(hAxis, 'CurrentPoint');
+%         %delete([findobj('tag', 'spotlight_patch'); findobj('tag', 'spotlight_xcrosshair'); findobj('tag', 'spotlight_ycrosshair')]);
+%         [view, coord] = getAxisInfo(hAxis, 'view', 'coord');
+%         axesToDraw = hAxis;
+%         for i=1:length(stateS.handle.CERRAxis);
+%             [otherView, otherCoord] = getAxisInfo(stateS.handle.CERRAxis(i), 'view', 'coord');
+%             if isequal(view, otherView) %& isequal(coord, otherCoord) & ~isequal(hAxis, stateS.handle.CERRAxis(i));
+%                 axesToDraw = [axesToDraw;stateS.handle.CERRAxis(i)];
+%             end
+%         end
+%         spotLightS.axesToDraw = axesToDraw;
+        
+        spotLightS = stateS.handle.spotLightS;
+        
+        hAxis = spotLightS.baseAxis;
+        
+        if ~isequal(gcbo,hAxis)
+            return;
+        end
+        
+        coord = getAxisInfo(hAxis, 'coord');
         cP = get(hAxis, 'CurrentPoint');
-        delete([findobj('tag', 'spotlight_patch'); findobj('tag', 'spotlight_xcrosshair'); findobj('tag', 'spotlight_ycrosshair')]);
-        [view, coord] = getAxisInfo(hAxis, 'view', 'coord');
-        axesToDraw = hAxis;
-        for i=1:length(stateS.handle.CERRAxis);
-            [otherView, otherCoord] = getAxisInfo(stateS.handle.CERRAxis(i), 'view', 'coord');
-            if isequal(view, otherView) & isequal(coord, otherCoord) & ~isequal(hAxis, stateS.handle.CERRAxis(i));
-                axesToDraw = [axesToDraw;stateS.handle.CERRAxis(i)];
-            end
-        end
-        delta = 0.2;
+        
         cross_hair_delta = 2;
-        thetaV = linspace(0,2*pi,30);
-        xV = cP(1,1) + delta*cos(thetaV);
-        yV = cP(2,2) + delta*sin(thetaV);
-        for i=1:length(axesToDraw);
-            % patch([cP(1,1)-delta cP(1,1)+delta cP(1,1)+delta cP(1,1)-delta cP(1,1)-delta], [cP(2,2)-delta cP(2,2)-delta cP(2,2)+delta cP(2,2)+delta cP(2,2)-delta], [0 1 0], 'tag', 'spotlight', 'userdata', hAxis, 'eraseMode', 'xor', 'parent', axesToDraw(i), 'edgeColor', 'none', 'faceColor', [0 1 0], 'faceAlpha', 0.5, 'hittest', 'off');
-            patch(xV, yV, [0 1 0], 'tag', 'spotlight_patch', 'userdata', hAxis, 'parent', axesToDraw(i), 'edgeColor', 'none', 'faceColor', [1 1 0], 'faceAlpha', 0.9, 'hittest', 'off');
-            line([cP(1,1)-cross_hair_delta cP(1,1)+cross_hair_delta], [cP(2,2) cP(2,2)], 'tag', 'spotlight_xcrosshair', 'userdata', hAxis, 'eraseMode', 'xor', 'parent', axesToDraw(i),  'color', [1 1 0], 'hittest', 'off','linewidth',3);
-            line([cP(1,1) cP(1,1)], [cP(2,2)-cross_hair_delta cP(2,2)+cross_hair_delta], 'tag', 'spotlight_ycrosshair', 'userdata', hAxis, 'eraseMode', 'xor', 'parent', axesToDraw(i),  'color', [1 1 0], 'hittest', 'off','linewidth',3);
-            line(cP(1,1), cP(2,2), 'tag', 'spotlight_trail', 'userdata', hAxis, 'parent', axesToDraw(i),  'color', [1 0.4 0.2], 'hittest', 'off','linewidth',3);
-        end
+%         delta = 0.2;
+%         thetaV = linspace(0,2*pi,30);
+%         xV = cP(1,1) + delta*cos(thetaV);
+%         yV = cP(2,2) + delta*sin(thetaV);
+        xV = [];
+        yV = [];
+        % APA added
+        % Get x,y coordinates on moving scan
+        %baseScanNum = 1;
+        %movScanNum = 2;
+        %indScanNum = 4;
+        %sizUnifBase = getUniformScanSize(planC{indexS.scan}(spotLightS.baseScanNum));
+        %[~,~,zBaseV] = getUniformScanXYZVals(...
+        %    planC{indexS.scan}(spotLightS.baseScanNum));
+        %sliceNum = findnearest(coord,zBaseV);
+        xV = [xV,...         
+            cP(1,1)-cross_hair_delta,...
+            cP(1,1)+cross_hair_delta,...
+            cP(1,1),...
+            cP(1,1),...
+            cP(1,1)];
+        yV = [yV,...
+            cP(2,2),...
+            cP(2,2),...
+            cP(2,2)-cross_hair_delta,...
+            cP(2,2)+cross_hair_delta,...
+            cP(2,2)];
+%             
+%         [rowV, colV] = xytom(xV, yV, sliceNum, planC,spotLightS.baseScanNum);
+%         rowV = round(rowV);
+%         colV = round(colV);
+%         indBaseV = sub2ind(sizUnifBase,rowV, colV, sliceNum*colV.^0);
+%         
+%         [movRowV,movColV,movSlcV] = ind2sub(sizUnifBase,indBaseV);
+%         indCtOffset = planC{indexS.scan}(spotLightS.indScanNum).scanInfo(1).CTOffset;
+%         indMovV = planC{indexS.scan}(spotLightS.indScanNum).scanArray - indCtOffset;        
+%         indMovV = indMovV(indBaseV);
+%         [xUnifMovV,yUnifMovV,zUnifMovV] = getUniformScanXYZVals(...
+%             planC{indexS.scan}(spotLightS.movScanNum));
+%         [xUnifMovM,yUnifMovM,zUnifMovM] = meshgrid(xUnifMovV,yUnifMovV,zUnifMovV);
+%         xmV = xUnifMovM(indMovV);
+%         ymV = yUnifMovM(indMovV);
+%         zmV = zUnifMovM(indMovV);
+%         
+        [xmV,ymV,zmV] = getMovScanCoords(xV, yV, coord, ...
+            spotLightS.baseScanNum, spotLightS.movScanNum, ...
+            spotLightS.indScanNum, planC);
+        
+        
+        crossHairHorXv = xmV(end-4:end-3);
+        crossHairHorYv = ymV(end-4:end-3);
+        %crossHairHorZv = zmV(end-4:end-3);
+        crossHairVerXv = xmV(end-2:end-1);
+        crossHairVerYv = ymV(end-2:end-1);
+        %crossHairVerZv = zmV(end-2:end-1);
+        crossHairX = xmV(end);
+        crossHairY = ymV(end);
+        crossHairZ = zmV(end);
+        %xmV = xmV(1:end-5);
+        %ymV = ymV(1:end-5);
+        %zmV = zmV(1:end-5);
+        % APA added ends
+%         for i=1:length(axesToDraw)
+%             axScan = getAxisInfo(axesToDraw(i),'scanSets');
+%             if axScan == spotLightS.baseScanNum
+%                 % patch([cP(1,1)-delta cP(1,1)+delta cP(1,1)+delta cP(1,1)-delta cP(1,1)-delta], [cP(2,2)-delta cP(2,2)-delta cP(2,2)+delta cP(2,2)+delta cP(2,2)-delta], [0 1 0], 'tag', 'spotlight', 'userdata', hAxis, 'eraseMode', 'xor', 'parent', axesToDraw(i), 'edgeColor', 'none', 'faceColor', [0 1 0], 'faceAlpha', 0.5, 'hittest', 'off');
+%                 %patch(xV, yV, [0 1 0], 'tag', 'spotlight_patch', 'userdata', hAxis, 'parent', axesToDraw(i), 'edgeColor', 'none', 'faceColor', [1 1 0], 'faceAlpha', 0.9, 'hittest', 'off');
+%                 spotLightS.base_spotlight_xcrosshair = line([cP(1,1)-cross_hair_delta cP(1,1)+cross_hair_delta], [cP(2,2) cP(2,2)], 'tag', 'spotlight_xcrosshair', 'userdata', hAxis, 'parent', axesToDraw(i),  'color', [1 1 0], 'hittest', 'off','linewidth',3);
+%                 spotLightS.base_spotlight_ycrosshair = line([cP(1,1) cP(1,1)], [cP(2,2)-cross_hair_delta cP(2,2)+cross_hair_delta], 'tag', 'spotlight_xcrosshair', 'userdata', hAxis, 'parent', axesToDraw(i),  'color', [1 1 0], 'hittest', 'off','linewidth',3);
+%                 %line(cP(1,1), cP(2,2), 'tag', 'spotlight_trail', 'userdata', hAxis, 'parent', axesToDraw(i),  'color', [1 0.4 0.2], 'hittest', 'off','linewidth',3);
+%             elseif axScan == spotLightS.movScanNum
+%                 setAxisInfo(axesToDraw(i),'coord',crossHairZ)
+%                 CERRRefresh
+%                 %patch(xmV, ymV, [0 1 0], 'tag', 'spotlight_patch', 'userdata', hAxis, 'parent', axesToDraw(i), 'edgeColor', 'none', 'faceColor', [1 1 0], 'faceAlpha', 0.9, 'hittest', 'off');
+%                 spotLightS.mov_spotlight_xcrosshair = line(crossHairHorXv, crossHairHorYv, 'tag', 'spotlight_xcrosshair', 'userdata', hAxis, 'parent', axesToDraw(i),  'color', [1 1 0], 'hittest', 'off','linewidth',3);
+%                 spotLightS.mov_spotlight_ycrosshair = line(crossHairVerXv, crossHairVerYv, 'tag', 'spotlight_ycrosshair', 'userdata', hAxis, 'parent', axesToDraw(i),  'color', [1 1 0], 'hittest', 'off','linewidth',3);
+%                 %line(crossHairX, crossHairY, 'tag', 'spotlight_trail', 'userdata', hAxis, 'parent', axesToDraw(i),  'color', [1 0.4 0.2], 'hittest', 'off','linewidth',3);                
+%             end
+%         end
+                
+        setAxisInfo(spotLightS.movAxis,'coord',crossHairZ)
+        %setAxisInfo(spotLightS.movAxis,'coord',crossHairZ,...
+        %    'xRange',[crossHairX-1 crossHairX+1],...
+        %    'yRange',[crossHairY+1 crossHairY-1])
+        %zoomToXYRange(spotLightS.movAxis)
+        CERRRefresh
+
+        spotLightS.base_spotlight_xcrosshair = line([cP(1,1)-cross_hair_delta cP(1,1)+cross_hair_delta], [cP(2,2) cP(2,2)], 'tag', 'spotlight_xcrosshair', 'parent', spotLightS.baseAxis,  'color', [1 1 0], 'hittest', 'off','linewidth',3);
+        spotLightS.base_spotlight_ycrosshair = line([cP(1,1) cP(1,1)], [cP(2,2)-cross_hair_delta cP(2,2)+cross_hair_delta], 'tag', 'spotlight_xcrosshair', 'parent', spotLightS.baseAxis,  'color', [1 1 0], 'hittest', 'off','linewidth',3);
+        spotLightS.mov_spotlight_xcrosshair = line(crossHairHorXv, crossHairHorYv, 'tag', 'spotlight_xcrosshair', 'parent', spotLightS.movAxis,  'color', [1 1 0], 'hittest', 'off','linewidth',3);
+        spotLightS.mov_spotlight_ycrosshair = line(crossHairVerXv, crossHairVerYv, 'tag', 'spotlight_ycrosshair', 'parent', spotLightS.movAxis,  'color', [1 1 0], 'hittest', 'off','linewidth',3);
+        
+        stateS.handle.spotLightS = spotLightS;
+        doseNum = 2;
+        doseVal = getDoseAt(doseNum, crossHairX, crossHairY, crossHairZ, planC);
+        strDose = ['Mov Dose = ',num2str(doseVal)];
+        CERRStatusString(strDose,'gui')
+        
+        
         return;
         
         
     case'SPOTLIGHTMOTION'
-        spotlight = findobj(gcbo,'tag', 'spotlight_patch');        
-        if isempty(spotlight)
-            return
-        end
-        hAxis = get(spotlight(1), 'userdata');
-        spotlight_trail = findobj(gcbo, 'tag', 'spotlight_trail');
-        cP = get(hAxis, 'CurrentPoint');
-        xTrailV = [get(spotlight_trail(1), 'XData'), cP(1,1)];
-        yTrailV = [get(spotlight_trail(1), 'YData'), cP(2,2)];
-        numTrailPts = 20;
-        if length(yTrailV) > numTrailPts
-            xTrailV = xTrailV(end-numTrailPts+1:end);
-            yTrailV = yTrailV(end-numTrailPts+1:end);
-        end
-        set(spotlight_trail, 'XData', xTrailV, 'YData', yTrailV);
-        delta = 0.2;
-        cross_hair_delta = 2;
-        thetaV = linspace(0,2*pi,30);
-        xV = cP(1,1) + delta*cos(thetaV);
-        yV = cP(2,2) + delta*sin(thetaV);        
-        %set(spotlight, 'XData', [cP(1,1)-delta cP(1,1)+delta cP(1,1)+delta cP(1,1)-delta cP(1,1)-delta]);
-        %set(spotlight, 'YData', [cP(2,2)-delta cP(2,2)-delta cP(2,2)+delta cP(2,2)+delta cP(2,2)-delta]);
-        set(spotlight, 'XData', xV);
-        set(spotlight, 'YData', yV);
-        spotlight_x_hair = findobj(gcbo, 'tag', 'spotlight_xcrosshair');
-        spotlight_y_hair = findobj(gcbo, 'tag', 'spotlight_ycrosshair');
-        set(spotlight_x_hair,'XData',[cP(1,1)-cross_hair_delta cP(1,1)+cross_hair_delta], 'YData',[cP(2,2) cP(2,2)])
-        set(spotlight_y_hair,'YData',[cP(2,2)-cross_hair_delta cP(2,2)+cross_hair_delta], 'XData',[cP(1,1) cP(1,1)])
+        %         spotlight = findobj(gcbo,'tag', 'spotlight_patch');
+        %         if isempty(spotlight)
+        %             return
+        %         end
+        %         hAxis = get(spotlight(1), 'userdata');
+        %         spotlight_trail = findobj(gcbo, 'tag', 'spotlight_trail');
+        %         cP = get(hAxis, 'CurrentPoint');
+        %         xTrailV = [get(spotlight_trail(1), 'XData'), cP(1,1)];
+        %         yTrailV = [get(spotlight_trail(1), 'YData'), cP(2,2)];
+        %         numTrailPts = 20;
+        %         if length(yTrailV) > numTrailPts
+        %             xTrailV = xTrailV(end-numTrailPts+1:end);
+        %             yTrailV = yTrailV(end-numTrailPts+1:end);
+        %         end
+        %         set(spotlight_trail, 'XData', xTrailV, 'YData', yTrailV);
+        %         delta = 0.2;
+        %         cross_hair_delta = 2;
+        %         thetaV = linspace(0,2*pi,30);
+        %         xV = cP(1,1) + delta*cos(thetaV);
+        %         yV = cP(2,2) + delta*sin(thetaV);
+        %         %set(spotlight, 'XData', [cP(1,1)-delta cP(1,1)+delta cP(1,1)+delta cP(1,1)-delta cP(1,1)-delta]);
+        %         %set(spotlight, 'YData', [cP(2,2)-delta cP(2,2)-delta cP(2,2)+delta cP(2,2)+delta cP(2,2)-delta]);
+        %         set(spotlight, 'XData', xV);
+        %         set(spotlight, 'YData', yV);
+        %         spotlight_x_hair = findobj(gcbo, 'tag', 'spotlight_xcrosshair');
+        %         spotlight_y_hair = findobj(gcbo, 'tag', 'spotlight_ycrosshair');
+        %         set(spotlight_x_hair,'XData',[cP(1,1)-cross_hair_delta cP(1,1)+cross_hair_delta], 'YData',[cP(2,2) cP(2,2)])
+        %         set(spotlight_y_hair,'YData',[cP(2,2)-cross_hair_delta cP(2,2)+cross_hair_delta], 'XData',[cP(1,1) cP(1,1)])
         
-        return;        
+        cross_hair_delta = 2;
+        spotLightS = stateS.handle.spotLightS;
+        % hAxis = get(spotLightS.base_spotlight_xcrosshair(1), 'userdata');
+        hAxis = spotLightS.baseAxis;
+        guiObj = gcbo;
+        if ~isequal(guiObj.CurrentObject,hAxis)
+            return;
+        end
+        
+        [~, coord] = getAxisInfo(hAxis, 'view', 'coord');
+        cP = get(hAxis, 'CurrentPoint');
+        xV = [];
+        yV = [];
+        xV = [xV,...
+            cP(1,1)-cross_hair_delta,...
+            cP(1,1)+cross_hair_delta,...
+            cP(1,1),...
+            cP(1,1),...
+            cP(1,1)];
+        yV = [yV,...
+            cP(2,2),...
+            cP(2,2),...
+            cP(2,2)-cross_hair_delta,...
+            cP(2,2)+cross_hair_delta,...
+            cP(2,2)];
+        [xmV,ymV,zmV] = getMovScanCoords(xV, yV, coord, ...
+            spotLightS.baseScanNum, spotLightS.movScanNum, ...
+            spotLightS.indScanNum, planC);
+        crossHairHorXv = xmV(end-4:end-3);
+        crossHairHorYv = ymV(end-4:end-3);
+        crossHairVerXv = xmV(end-2:end-1);
+        crossHairVerYv = ymV(end-2:end-1);
+        crossHairX = xmV(end);
+        crossHairY = ymV(end);
+        crossHairZ = zmV(end);
+        setAxisInfo(spotLightS.movAxis,'coord',crossHairZ)
+        doseNum = 2;
+        doseVal = getDoseAt(doseNum, crossHairX, crossHairY, crossHairZ, planC);
+        strDose = ['Mov Dose = ',num2str(doseVal)];
+        CERRStatusString(strDose,'gui')
+
+        %         setAxisInfo(spotLightS.movAxis,'coord',crossHairZ,...
+%             'xRange',[crossHairX-1 crossHairX+1],...
+%             'yRange',[crossHairY+1 crossHairY-1])
+        %zoomToXYRange(spotLightS.movAxis)
+        %CERRRefresh
+        
+        
+        setAxisInfo(spotLightS.movAxis,'coord',crossHairZ)
+        CERRRefresh        
+        
+        set(spotLightS.base_spotlight_xcrosshair,'XData',[cP(1,1)-cross_hair_delta cP(1,1)+cross_hair_delta], 'YData',[cP(2,2) cP(2,2)])
+        set(spotLightS.base_spotlight_ycrosshair,'YData',[cP(2,2)-cross_hair_delta cP(2,2)+cross_hair_delta], 'XData',[cP(1,1) cP(1,1)])
+        set(spotLightS.mov_spotlight_xcrosshair,'YData',crossHairHorYv, 'XData',crossHairHorXv)
+        set(spotLightS.mov_spotlight_ycrosshair,'YData',crossHairVerYv, 'XData',crossHairVerXv)
+        
+        return;
         
     case 'SPOTLIGHTMOTIONDONE'
         hFig = gcbo;

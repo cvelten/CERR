@@ -352,6 +352,10 @@ switch upper(command)
         ROE('CLEAR_PLOT',hFig);
         
         ud = get(hFig,'userdata');
+        if ~isfield(ud,'planNum') || isempty(ud.planNum) || ud.planNum==0
+            msgbox('Please select valid dose plan','Selection required');
+            return
+        end
         indexS = planC{end};
         
         %% Initialize plot handles
@@ -408,6 +412,18 @@ switch upper(command)
                 for p = 1:numel(protocolS)
                     
                     modelC = protocolS(p).model;
+                    
+                    %Ensure reqd structures are selected 
+                    strSelC = cellfun(@(x)x.strNum , modelC,'un',0);
+                    noSelV = find([strSelC{:}]==0);
+                    
+                    if any(noSelV)
+                       modList = cellfun(@(x)x.name , modelC,'un',0);
+                       modList = strjoin(modList(noSelV),',');  
+                       msgbox(['Please select structures required for models ' modList],'Selection required');
+                       return
+                    end
+                    
                     modTypeC = cellfun(@(x)(x.type),modelC,'un',0);
                     xIndx = find(strcmp(modTypeC,'BED') | strcmp(modTypeC,'TCP')); %Identify TCP/BED models
                     
@@ -818,6 +834,7 @@ switch upper(command)
                         ud.NTCPCurve(ntcp).DisplayName = [ud.Protocols(p).protocol,': ',modelC{modIdxV(j)}.name];
                         hCurr = hNTCPAxis;
                     end
+
                 else %plotModes 3&4
                     
                     if plotMode == 4
@@ -1235,6 +1252,9 @@ switch upper(command)
         if isfield(ud,'y2Disp')
             ud = rmfield(ud,'y2Disp');
         end
+        
+        %Clear user-input scale factor/no. frx
+        set(ud.handle.modelsAxis(10),'String','')
         
         %Turn off datacursor mode
         cursorMode = datacursormode(hFig);
@@ -2203,7 +2223,12 @@ end
                 prtcNumV = 1:length(ud.Protocols); %For initialization
             end
             
-            planNum = ud.planNum;
+            if isfield(ud,'planNum')
+                planNum = ud.planNum;
+            else
+                planNum = [];
+            end
+            
             for t = 1:length(prtcNumV)
                 
                 if ~isempty(planNum)
@@ -2257,8 +2282,11 @@ end
                         end
                     end
                     
+                    
                     %Get parameters
+                    set(hFig,'userdata',ud);
                     hPar = extractParams(modelsC{modelNumV(s)});
+                    ud = get(hFig,'userdata');
                     
                     if ~isempty(hEvt)
                         %Add file properties if missing
@@ -2501,11 +2529,11 @@ end
                     end
                     
                     if ~skip %Error here: TO DO! Check!
-%                         plot([xScale xScale],[0 cpNew],'Color',pColorM(clrIdx,:),'LineStyle','-.',...
-%                             'linewidth',2,'parent',hplotAx);
-%                         plot([loc xScale],[cpNew cpNew],'Color',pColorM(clrIdx,:),'LineStyle','-.',...
-%                             'linewidth',2,'parent',hplotAx);
-%                         set(hText,'Position',[txtPos,cpNew],'String',sprintf('%.3f',cpNew));
+                        plot([xScale xScale],[0 cpNew],'Color',pColorM(clrIdx,:),'LineStyle','-.',...
+                            'linewidth',2,'parent',hplotAx);
+                        plot([loc xScale],[cpNew cpNew],'Color',pColorM(clrIdx,:),'LineStyle','-.',...
+                            'linewidth',2,'parent',hplotAx);
+                        set(hText,'Position',[txtPos,cpNew],'String',sprintf('%.3f',cpNew));
                     end
                     
                 end
@@ -2532,11 +2560,18 @@ end
         ud.plotMode = sel - 1;
         if ud.plotMode==3
              set(ud.handle.modelsAxis(11),'String','Enter scale factor');
-        else
+             set(ud.handle.modelsAxis(10),'Visible','On','Enable','On');
+             set(ud.handle.modelsAxis(11),'Visible','On'); 
+        elseif ud.plotMode==4
              txt = sprintf('Enter\n \x0394nfrx');
              set(ud.handle.modelsAxis(11),'String',txt);
+               set(ud.handle.modelsAxis(10),'Visible','On','Enable','On');
+             set(ud.handle.modelsAxis(11),'Visible','On'); 
+        else
+            set(ud.handle.modelsAxis(10),'Visible','Off');
+            set(ud.handle.modelsAxis(11),'Visible','Off');
         end
-        set(ud.handle.modelsAxis(11),'Visible','On');
+       
         set(hFig,'userData',ud);
     end
 

@@ -59,7 +59,7 @@ if(nargin == 0)
     if isdeployed
         file = fullfile(getCERRPath,'pics','CERR.png'); 
     else
-        file = 'CERR.png';
+        file = fullfile(getCERRPath,'CERR.png');
     end
     [background, map] = imread(file,'png');
     CERRStartupFig = figure('units', 'pixels', 'position',[(screenSize(3)-x)/2 (screenSize(4)-y)/2 x y], 'MenuBar', 'none', 'NumberTitle', 'off', 'resize', 'off', 'Tag', 'CERRStartupFig','CloseRequestFcn','CERR(''QUIT'')');
@@ -77,7 +77,7 @@ if(nargin == 0)
     %Layer buttons and text labels over the background
     importOptions = {'Select format...';'DICOM';'RTOG';'Gamma Knife';'PLUNC';'DICOM (Deprecated)';'FDF'};
 
-    uicontrol('units',units,'Position',[.055 .29 .22 .05],'String',importOptions,'Style','popup',...
+    uicontrol('units',units,'Position',[.055 .29 .22 .05],'String',importOptions,'Style','popupmenu',...
         'BackgroundColor',[1 1 1] ,'tooltipstring','Select Import Option',...
         'HorizontalAlignment','center','FontSize',10,'Tag', 'CERRImportPopUp');
 
@@ -93,7 +93,7 @@ if(nargin == 0)
 
     %     uicontrol('units',units,'Position',[.585 .3 .1 .05],'String','Viewer','Style','text','HorizontalAlignment','left');
     %uicontrol('units',units,'Position',[.725 .27 .17 .07],'String','Viewer', 'callback','CERR(''CERRSLICEVIEWER'')','FontSize',10);
-    uicontrol('units',units,'Position',[.71 .27 .22 .07],'Style','popup', 'tooltipstring','Select mode', ...
+    uicontrol('units',units,'Position',[.71 .27 .22 .07],'Style','popupmenu', 'tooltipstring','Select mode', ...
         'String',{'Select mode..','Study','Cohort'},'FontSize',10, 'callback', 'CERR(''CERRSLICEVIEWER'')','Tag','ReviewMode');
 
     %     uicontrol('units',units,'Position',[.835 .50 .1 .05],'String','Quit','callback','CERR(''QUIT'')');

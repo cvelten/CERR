@@ -26,22 +26,27 @@ switch (passedScanDim)
     
     case '3D'
         
-        mask3M = maskC{1};
+%         mask3M = maskC{1}{1};
         %Write mask
-        if ~isempty(mask3M) && ~testFlag
+%         if ~isempty(mask3M) && ~testFlag
+        if ~isempty(maskC{1}) && ~testFlag
+            mask3M = maskC{1}{1};
             if ~exist(fullfile(outDirC{1},'Masks'),'dir')
                 mkdir(fullfile(outDirC{1},'Masks'))
             end
             mask3M = uint8(mask3M);
             maskFilename = fullfile(outDirC{1},'Masks',[filePrefix,'_3D.h5']);
             h5create(maskFilename,'/mask',size(mask3M));
+            pause(0.1)
             h5write(maskFilename,'/mask',mask3M);
         end
         
         %Write scan
-        exportScan3M = scanC{1}{1};
+        exportScan3M = scanC{1}{1}; % one view and one scan matrix
+        %exportScan3M = scanC{1};
         scanFilename = fullfile(outDirC{1},[filePrefix,'_scan_3D.h5']);
         h5create(scanFilename,'/scan',size(exportScan3M));
+        pause(0.1)
         h5write(scanFilename,'/scan',exportScan3M);
         
         
@@ -50,14 +55,13 @@ switch (passedScanDim)
         %Loop over views
         for i = 1:length(scanC)
             
-            mask3M = maskC{i};
-            
-            
             % Loop over slices
             for slIdx = 1:size(scanC{i}{1},3)
-                
+             
                 %Write mask
-                if ~isempty(mask3M) && ~testFlag
+                if ~isempty(maskC) && ~isempty(maskC{i}) && ~testFlag
+                    mask3M = maskC{i};
+
                     if slIdx == 1
                         if ~exist(fullfile(outDirC{i},'Masks'),'dir')
                             mkdir(fullfile(outDirC{i},'Masks'))
@@ -66,6 +70,8 @@ switch (passedScanDim)
                     maskM = uint8(mask3M(:,:,slIdx));
                     maskFilename = fullfile(outDirC{i},'Masks',[filePrefix,'_slice',...
                         num2str(slIdx),'.h5']);
+                    
+                    
                     % Low-level h5 write
                     filename = maskFilename;
                     fileID = H5F.create(filename,'H5F_ACC_TRUNC','H5P_DEFAULT','H5P_DEFAULT');

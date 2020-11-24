@@ -123,7 +123,9 @@ else
 end
 
 %Update uniformized data.
-planC = updateStructureMatrices(planC, numStructs+1);
+if strcmpi(stateS.optS.createUniformizedDataset,'yes')
+    planC = updateStructureMatrices(planC, numStructs+1);
+end
 
 %Set varargout if requested.
 if nargout > 0

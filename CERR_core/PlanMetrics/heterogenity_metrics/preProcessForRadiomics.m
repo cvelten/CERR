@@ -1,5 +1,5 @@
-function [volToEval,maskBoundingBox3M,gridS] = preProcessForRadiomics(scanNum,...
-                                               structNum, paramS, planC)
+function [volToEval,maskBoundingBox3M,gridS,paramS] = preProcessForRadiomics(scanNum,...
+    structNum, paramS, planC)
 % preProcessForRadiomics.m
 % Pre-process image for radiomics feature extraction. Includes
 % perturbation, resampling, cropping, and intensity-thresholding.
@@ -19,7 +19,7 @@ if numel(scanNum) == 1
     
     % Get structure mask
     [rasterSegments] = getRasterSegments(structNum,planC);
-    [mask3M, uniqueSlices] = rasterToMask(rasterSegments, scanNum, planC);
+    [maskUniq3M, uniqueSlices] = rasterToMask(rasterSegments, scanNum, planC);
     
     % Get scan
     scanArray3M = getScanArray(planC{indexS.scan}(scanNum));
@@ -28,29 +28,31 @@ if numel(scanNum) == 1
     
     scanSiz = size(scanArray3M);
     
-    % Pad scanArray and mask3M to interpolate
-    minSlc = min(uniqueSlices);
-    maxSlc = max(uniqueSlices);
-    if minSlc > 1
-        mask3M = padarray(mask3M,[0 0 1],'pre');
-        uniqueSlices = [minSlc-1; uniqueSlices];
-    end
-    if maxSlc < scanSiz(3)
-        mask3M = padarray(mask3M,[0 0 1],'post');
-        uniqueSlices = [uniqueSlices; maxSlc+1];
-    end
+    mask3M = false(scanSiz);
     
-    scanArray3M = scanArray3M(:,:,uniqueSlices);
+    mask3M(:,:,uniqueSlices) = maskUniq3M;
     
     % Get x,y,z grid for reslicing and calculating the shape features
     [xValsV, yValsV, zValsV] = getScanXYZVals(planC{indexS.scan}(scanNum));
     if yValsV(1) > yValsV(2)
         yValsV = fliplr(yValsV);
     end
-    zValsV = zValsV(uniqueSlices);
-   
+    %zValsV = zValsV(uniqueSlices);
+    
+%     % Get image types with various parameters
+%     fieldNamC = fieldnames(paramS.imageType);
+%     for iImg = 1:length(fieldNamC)
+%         for iFilt = 1:length(paramS.imageType.(fieldNamC{iImg}))
+%             imageType = fieldNamC{iImg};
+%             if strcmpi(imageType,'SUV')
+%                 scanInfoS = planC{indexS.scan}(scanNum).scanInfo;
+%                 paramS.imageType.(fieldNamC{iImg})(iFilt).scanInfoS = scanInfoS;
+%             end
+%         end
+%     end
+    
 else
-   
+    
     scanArray3M = scanNum;
     mask3M = structNum;
     
@@ -73,8 +75,7 @@ PixelSpacingX = abs(xValsV(1) - xValsV(2));
 PixelSpacingY = abs(yValsV(1) - yValsV(2));
 PixelSpacingZ = abs(zValsV(1) - zValsV(2));
 
-
-%Get pre-processing parameters
+%% Apply global settings
 whichFeatS = paramS.whichFeatS;
 
 perturbX = 0;
@@ -96,96 +97,141 @@ if whichFeatS.perturbation.flag
         perturbY = PixelSpacingY*perturbFractionV(randsample(4,1));
         perturbZ = PixelSpacingZ*perturbFractionV(randsample(4,1));
     end
-
+    
 end
 
-%--- 2. Resampling ---
 
-% Pixelspacing (dx,dy,dz) after resampling 
-if whichFeatS.resample.flag && ~isempty(whichFeatS.resample.resolutionXCm)
-    PixelSpacingX = whichFeatS.resample.resolutionXCm;
+%--- 2. Crop scan around mask and pad as required ---
+padScaleX = 1;
+padScaleY = 1;
+padScaleZ = 1;
+if whichFeatS.resample.flag
+    dx = median(diff(xValsV));
+    dy = median(diff(yValsV));
+    dz = median(diff(zValsV));
+    padScaleX = ceil(whichFeatS.resample.resolutionXCm/dx);
+    padScaleY = ceil(whichFeatS.resample.resolutionYCm/dy);
+    padScaleZ = ceil(whichFeatS.resample.resolutionZCm/dz);
 end
-if whichFeatS.resample.flag && ~isempty(whichFeatS.resample.resolutionYCm)
-    PixelSpacingY = whichFeatS.resample.resolutionYCm;
-end
-if whichFeatS.resample.flag && ~isempty(whichFeatS.resample.resolutionZCm)
-    PixelSpacingZ = whichFeatS.resample.resolutionZCm;
+if whichFeatS.padding.flag
+    if ~isfield(whichFeatS.padding,'method')
+        %Default:Pad by 5 voxels (original image intensities)
+        padMethod = 'expand';
+        padSizV = [5,5,5];
+    else
+        padMethod = whichFeatS.padding.method;
+        padSizV = whichFeatS.padding.size;
+        padSizV = reshape(padSizV,1,[]);
+    end
+else
+    %Default:Pad by 5 voxels (original image intensities)
+    padMethod = 'expand';
+    padSizV = [5,5,5];
 end
 
-% Get the new x,y,z grid
-xValsV = (xValsV(1)+perturbX):PixelSpacingX:(xValsV(end)+10000*eps+perturbX);
-yValsV = (yValsV(1)+perturbY):PixelSpacingY:(yValsV(end)+10000*eps+perturbY);
-zValsV = (zValsV(1)+perturbZ):PixelSpacingZ:(zValsV(end)+10000*eps+perturbZ);
+padSizV = padSizV.*[padScaleX,padScaleY,padScaleZ];
+whichFeatS.padding.size = padSizV;
 
-% Interpolate using sinc sampling
-numCols = length(xValsV);
-numRows = length(yValsV);
-numSlcs = length(zValsV);
+% Crop to ROI and pad
+scanArray3M = double(scanArray3M);
+[volToEval,maskBoundingBox3M,outLimitsV] = padScan(scanArray3M,mask3M,padMethod,padSizV);
+xValsV = xValsV(outLimitsV(3):outLimitsV(4));
+yValsV = yValsV(outLimitsV(1):outLimitsV(2));
+zValsV = zValsV(outLimitsV(5):outLimitsV(6));
+slcIndV = outLimitsV(5):outLimitsV(6);
+
+%--- 3. Resampling ---
+
 %Get resampling method
 if whichFeatS.resample.flag
-    switch whichFeatS.resample.interpMethod
-        case 'sinc'
-            method = 'lanczos3'; % Lanczos-3 kernel
-        case 'cubic'
-            method = 'cubic'; % cubic kernel
-        case 'linear'
-            method = 'linear'; % 
-        case 'triangle'
-            method = 'triangle'; % cubic kernel
-        otherwise
-            error('Interpolatin method not supported');
+    % Pixelspacing (dx,dy,dz) after resampling
+    if ~isempty(whichFeatS.resample.resolutionXCm)
+        PixelSpacingX = whichFeatS.resample.resolutionXCm;
     end
-    scanArray3M = imresize3(scanArray3M,[numRows numCols numSlcs],...
-        'method',method,'Antialiasing',false);
-    %mask3M = imresize3(single(mask3M),[numRows numCols numSlcs],'method',method) >= 0.5;
+    if ~isempty(whichFeatS.resample.resolutionYCm)
+        PixelSpacingY = whichFeatS.resample.resolutionYCm;
+    end
+    if ~isempty(whichFeatS.resample.resolutionZCm)
+        PixelSpacingZ = whichFeatS.resample.resolutionZCm;
+    end
+    
+    % Interpolate using the method defined in settings file
     roiInterpMethod = 'linear';
-    mask3M = imresize3(single(mask3M),[numRows numCols numSlcs],...
-        'method',roiInterpMethod,'Antialiasing',false) >= 0.5;
+    scanInterpMethod = whichFeatS.resample.interpMethod;
+    extrapVal = 0;
+    gridResampleMethod = 'center';
+    
+    % Interpolate using the method defined in settings file
+    origVolToEval = volToEval;
+    origMask = maskBoundingBox3M;
+    outputResV = [PixelSpacingX,PixelSpacingY,PixelSpacingZ];
+    
+    %Get resampling grid 
+    [xResampleV,yResampleV,zResampleV] = ...
+        getResampledGrid(outputResV,xValsV,yValsV,zValsV,...
+        gridResampleMethod,[perturbX,perturbY,perturbZ]);
+    %Resample scan
+    volToEval = imgResample3d(origVolToEval,xValsV,yValsV,zValsV,...
+        xResampleV,yResampleV,zResampleV,scanInterpMethod);
+    %Resample mask
+    maskBoundingBox3M = imgResample3d(single(origMask),xValsV,yValsV,zValsV,...
+        xResampleV,yResampleV,zResampleV,roiInterpMethod) >= 0.5;
+    
+    newSlcIndV = zeros(1,length(zResampleV));
+    for iSlc = 1:length(zResampleV)
+        newSlcIndV(iSlc) = findnearest(zValsV, zResampleV(iSlc));
+    end
+    
+else
+    xResampleV = xValsV;
+    yResampleV = yValsV;
+    zResampleV = zValsV;
+    newSlcIndV = slcIndV;
 end
 
 
-% Crop scan around mask
-margin = 10;
-origSiz = size(mask3M);
-[minr, maxr, minc, maxc, mins, maxs] = compute_boundingbox(mask3M);
-minr = max(1,minr-margin);
-maxr = min(origSiz(1),maxr+margin);
-minc = max(1,minc-margin);
-maxc = min(origSiz(2),maxc+margin);
-mins = max(1,mins-margin);
-maxs = min(origSiz(3),maxs+margin);
-maskBoundingBox3M = mask3M(minr:maxr,minc:maxc,mins:maxs);
+%--- 4. Ignore voxels below and above cutoffs, if defined ----
 
-% Get the cropped scan
-volToEval = double(scanArray3M(minr:maxr,minc:maxc,mins:maxs));
-
-% Crop grid and Pixelspacing (dx,dy,dz)
-xValsV = xValsV(minc:maxc);
-yValsV = yValsV(minr:maxr);
-zValsV = zValsV(mins:maxs);
-
-% Ignore voxels below and above cutoffs, if defined
-minIntensityCutoff = [];
-maxIntensityCutoff = [];
-if isfield(paramS.textureParamS,'minIntensityCutoff')
-    minIntensityCutoff = paramS.textureParamS.minIntensityCutoff;
-end
-if isfield(paramS.textureParamS,'maxIntensityCutoff')
-    maxIntensityCutoff = paramS.textureParamS.maxIntensityCutoff;
-end
-if ~isempty(minIntensityCutoff)
-    maskBoundingBox3M(volToEval < minIntensityCutoff) = 0;
-end
-if ~isempty(maxIntensityCutoff)
-    maskBoundingBox3M(volToEval > maxIntensityCutoff) = 0;
+minSegThreshold = [];
+maxSegThreshold = [];
+if isfield(paramS,'textureParamS')
+    if isfield(paramS.textureParamS,'minSegThreshold')
+        minSegThreshold = paramS.textureParamS.minSegThreshold;
+    end
+    if isfield(paramS.textureParamS,'maxSegThreshold')
+        maxSegThreshold = paramS.textureParamS.maxSegThreshold;
+    end
+    if ~isempty(minSegThreshold)
+        maskBoundingBox3M(volToEval < minSegThreshold) = 0;
+    end
+    if ~isempty(maxSegThreshold)
+        maskBoundingBox3M(volToEval > maxSegThreshold) = 0;
+    end
 end
 
 %volToEval(~maskBoundingBox3M) = NaN;
 
 % Return grid and pixel-spacing
-gridS.xValsV = xValsV;
-gridS.yValsV = yValsV;
-gridS.zValsV = zValsV;
+gridS.xValsV = xResampleV;
+gridS.yValsV = yResampleV;
+gridS.zValsV = zResampleV;
 gridS.PixelSpacingV = [PixelSpacingX,PixelSpacingY,PixelSpacingZ];
+
+% Pass scanInfo as an additional parameter for imageType = SUV
+if numel(scanNum) == 1
+    % Get image types with various parameters
+    fieldNamC = fieldnames(paramS.imageType);
+    for iImg = 1:length(fieldNamC)
+        for iFilt = 1:length(paramS.imageType.(fieldNamC{iImg}))
+            imageType = fieldNamC{iImg};
+            if strcmpi(imageType,'SUV')
+                scanInfoS = planC{indexS.scan}(scanNum).scanInfo;
+                scanInfoS = scanInfoS(slcIndV);
+                scanInfoS = scanInfoS(newSlcIndV);
+                paramS.imageType.(fieldNamC{iImg})(iFilt).scanInfoS = scanInfoS;
+            end
+        end
+    end
+end
 
 end

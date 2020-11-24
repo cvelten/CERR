@@ -97,7 +97,7 @@ switch tag
         
         %Take into account the deletion of last point that will occur in
         %the Contour Data routine if first/last points are duplicates.
-        if contour(1,:) == contour(end,:) & size(contour, 1) > 1
+        if all(contour(1,:) == contour(end,:)) && size(contour, 1) > 1
            data = data - 1;
         end
         
@@ -109,12 +109,12 @@ switch tag
         
         %Convert from CERR coordinates to DICOM coordinates based on pt
         %position.
-        ptPos = scanS.scanInfo(1).patientPosition;
-        contour = convertCoordinates(contour, ptPos);
+        imgOri = scanS.scanInfo(1).imageOrientationPatient;
+        contour = convertCoordinates(contour, imgOri);
         
         %Check for first/last points being the same.  If the same, remove
         %one as specified by DICOM's closed contour definition.
-        if contour(1,:) == contour(end,:) & size(contour, 1) > 1
+        if all(contour(1,:) == contour(end,:)) && size(contour, 1) > 1
            contour(end,:) = [] ;
         end
         

@@ -1,4 +1,5 @@
-function [minr, maxr, minc, maxc, mins, maxs] = getCropLimits(planC,mask3M,scanNum,cropS)
+function [minr, maxr, minc, maxc, slcV, modelMask3M, planC] = ...
+    getCropLimits(planC,mask3M,scanNum,cropS)
 % getCropLimits.m
 % Get limits of bounding box for various cropping options.
 %
@@ -16,7 +17,7 @@ function [minr, maxr, minc, maxc, mins, maxs] = getCropLimits(planC,mask3M,scanN
 % AI 7/23/19
 
 %Get mask for model config
-modelMask3M = getMaskForModelConfig(planC,mask3M,scanNum,cropS);
+[modelMask3M, planC] = getMaskForModelConfig(planC,mask3M,scanNum,cropS);
 
 %Compute bounding box
 methodC = {cropS.method};
@@ -27,14 +28,11 @@ if length(methodC) == 1 && strcmp(methodC{1},'none')
     maxr = scanSizeV(1);
     minc = 1;
     maxc = scanSizeV(2);
-    mins = 1;
-    maxs = scanSizeV(3);
+    slcV = 1:scanSizeV(3);
     
 elseif any(ismember(methodC,crop2DMethodsC))
     
-    [~, ~, ~, ~, mins, maxs] = compute_boundingbox(modelMask3M);
-    
-    slcV = mins:maxs;
+    slcV = find(sum(sum(modelMask3M))>0);
     numSlcs = length(slcV);
     minr = nan(numSlcs,1);
     minc = nan(numSlcs,1);
@@ -43,9 +41,9 @@ elseif any(ismember(methodC,crop2DMethodsC))
     for n = 1:numSlcs
         [minr(n), maxr(n), minc(n), maxc(n)] = compute_boundingbox(modelMask3M(:,:,slcV(n)));
     end
-    
 else
-    [minr, maxr, minc, maxc, mins, maxs] = compute_boundingbox(modelMask3M);
+    [minr, maxr, minc, maxc] = compute_boundingbox(modelMask3M);
+    slcV = find(sum(sum(modelMask3M))>0);
 end
 
 

@@ -71,10 +71,11 @@ end
 %wy
 
 
-minC = min(Cdata(:));
-if minC<cLim(1)
-    set(hAxis, 'CLim', [minC cLim(2)]);
-end
+% minC = min(Cdata(:));
+% if minC<cLim(1)
+%     set(hAxis, 'CLim', [minC cLim(2)]);
+% end
+set(hAxis, 'CLim', [0,1]);
 
 % if length(surfaces) < 2
 %     %set(hFig, 'renderer', 'zbuffer');
@@ -85,21 +86,46 @@ end
 
 switch method
     case 'colorblend'
+        ud = stateS.handle.controlFrameUd ;
+        
         cLim = get(hAxis, 'cLim');
         %img1 = get(surfaces(1), 'cData');
         %img2 = get(surfaces(2), 'cData');
         
         if stateS.handle.aI(axNum).scanObj(1).scanSet == stateS.imageRegistrationBaseDataset
-            img1 = get(stateS.handle.aI(axNum).scanObj(1).handles,'cData');
-            img2 = get(stateS.handle.aI(axNum).scanObj(2).handles,'cData');
+            %img1 = get(stateS.handle.aI(axNum).scanObj(1).handles,'cData');
+            %img2 = get(stateS.handle.aI(axNum).scanObj(2).handles,'cData');            
             baseIndex = 1;
             movIndex = 2;
         elseif stateS.handle.aI(axNum).scanObj(1).scanSet == stateS.imageRegistrationMovDataset
-            img1 = get(stateS.handle.aI(axNum).scanObj(2).handles,'cData');
-            img2 = get(stateS.handle.aI(axNum).scanObj(1).handles,'cData');
+            %img1 = get(stateS.handle.aI(axNum).scanObj(2).handles,'cData');
+            %img2 = get(stateS.handle.aI(axNum).scanObj(1).handles,'cData');
             baseIndex = 2;
             movIndex = 1;
-        end
+        end       
+        
+        CTOffset    = planC{indexS.scan}(stateS.imageRegistrationBaseDataset).scanInfo(1).CTOffset;
+        scanUID = ['c',repSpaceHyp(planC{indexS.scan}(stateS.imageRegistrationBaseDataset).scanUID(max(1,end-61):end))];
+        CTLevel     = stateS.scanStats.CTLevel.(scanUID) + CTOffset;
+        CTWidth     = stateS.scanStats.CTWidth.(scanUID);
+        CTLow       = CTLevel - CTWidth/2;
+        CTHigh      = CTLevel + CTWidth/2;
+        img1 = stateS.handle.aI(axNum).scanObj(baseIndex).data2M;
+        img1 = img1 - double(CTLow);
+        img1 = img1 / double( CTHigh - CTLow);
+
+        
+        CTOffset    = planC{indexS.scan}(stateS.imageRegistrationMovDataset).scanInfo(1).CTOffset;
+        scanUID = ['c',repSpaceHyp(planC{indexS.scan}(stateS.imageRegistrationMovDataset).scanUID(max(1,end-61):end))];
+        CTLevel     = stateS.scanStats.CTLevel.(scanUID) + CTOffset;
+        CTWidth     = stateS.scanStats.CTWidth.(scanUID);
+        CTLow       = CTLevel - CTWidth/2;
+        CTHigh      = CTLevel + CTWidth/2;
+        img2 = stateS.handle.aI(axNum).scanObj(movIndex).data2M;        
+        img2 = img2 - double(CTLow);
+        img2 = img2 / double( CTHigh - CTLow);
+        
+        
         surfaces = [stateS.handle.aI(axNum).scanObj(baseIndex).handles, ...
             stateS.handle.aI(axNum).scanObj(movIndex).handles];
         
@@ -161,7 +187,13 @@ switch method
             set(gcf,'Pointer','arrow');
         end
         if stateS.optS.mirrorscope
-            lineInfo = get(findobj(hAxis, 'tag', 'mirrorLocator'), 'userdata');
+            lineInfo = [];
+            if isfield(stateS.handle.aI(axNum).axisFusion,'MirrorScopeLocator')
+                hMirrorLocator = stateS.handle.aI(axNum).axisFusion.MirrorScopeLocator;
+                if ishandle(hMirrorLocator)
+                    lineInfo = get(hMirrorLocator, 'userdata');
+                end
+            end
             if ~isempty(lineInfo)
                 mirrPos = lineInfo{3};
             end
@@ -186,7 +218,8 @@ switch method
             return;
             
         elseif stateS.optS.mirrorscope
-            hBox = findobj('Tag', 'MirrorScope', 'Parent', hAxis);
+            %hBox = findobj('Tag', 'MirrorScope', 'Parent', hAxis);
+            hBox = stateS.handle.aI(axNum).axisFusion.MirrorScopePatch;
             ud = get(hBox, 'userdata');
             xyRange = ud{1}; %ud{1} = [x: min(ud{2}) max(ud{2}) y: max(ud{3}) min(ud{3})];
             
@@ -242,14 +275,28 @@ switch method
                 set(surfaces(1:end), 'facealpha', 1);
                 set(surfaces(end), 'facealpha', 0);
                 
+                % Set stacking order so that MirrorScope patch is at the
+                % top
+                %childV = get(hAxis,'Children');
+                %childV([1,2,3]) = childV([3,1,2]);
+                %set(hAxis,'Children',childV);
+                uistack(hBox,'top')
+                
                 return;
             end
             
             
             
         elseif stateS.optS.mirror
+            if isempty(img1) || isempty(img2)
+                return
+            end
             
-            lineInfo = get(findobj(hAxis, 'tag', 'mirrorLocator'), 'userdata');
+            lineInfo = [];
+            if isfield(stateS.handle.aI(axNum).axisFusion,'MirrorScopeLocator')
+                hMirrorLocator = stateS.handle.aI(axNum).axisFusion.MirrorScopeLocator;
+                lineInfo = get(hMirrorLocator, 'userdata');
+            end
             if ~isempty(lineInfo)
                 mirrPos = lineInfo{3};
             end
@@ -286,12 +333,15 @@ switch method
                 set(surfaces(end-1), 'cData', imgOv, 'xdata', xd, 'ydata', [sliceYVals1(1) sliceYVals1(end)]);
             end
             
-            set(surfaces(1:end), 'facealpha', 1);
-            set(surfaces(end), 'facealpha', 0);
+            %set(surfaces(1:end), 'facealpha', 1);
+            %set(surfaces(end), 'facealpha', 0);
             
             return;
             
         elseif stateS.optS.mirrchecker
+            if isempty(img1) || isempty(img2)
+                return
+            end
             imgOv = RegdoMirrCheckboard(img1, img2, checkerSize, checkerSize);
             set(surfaces(end-1), 'cData', double(imgOv));
             set(surfaces(1:end), 'facealpha', 0);
@@ -300,6 +350,9 @@ switch method
             return;
             
         elseif stateS.optS.newchecker
+            if isempty(img1) || isempty(img2)
+                return;
+            end
             imgOv = RegdoCheckboard(img1, img2, checkerSize, checkerSize);
             set(surfaces(end-1), 'cData', double(imgOv), 'xdata', [sliceXVals1(1) sliceXVals1(end)], 'ydata', [sliceYVals1(1) sliceYVals1(end)]);
             set(surfaces(1:end), 'facealpha', 0);
@@ -308,10 +361,15 @@ switch method
             return;
             
         elseif stateS.optS.mirrorCheckerBoard
+            if isempty(img1) || isempty(img2)
+                return;
+            end
             orientationVal = get(ud.handles.mirrorcheckerOrientation,'value');
             orientationStr = get(ud.handles.mirrorcheckerOrientation,'string');
             orientation = orientationStr{orientationVal};
-            metricVal = get(ud.handles.mirrorcheckerMetricPopup,'value');
+            checkerSize = get(ud.handles.newcheckerSize,'value');
+            metricVal = round(get(ud.handles.mirrorcheckerMetricPopup,'value'));
+            set(ud.handles.mirrorcheckerMetricPopup,'value',metricVal)
             imgOv = RegdoMirrCheckboard(img1, img2, checkerSize, checkerSize, orientation, metricVal);
             set(surfaces(end-1), 'cData', double(imgOv));
             set(surfaces(1:end), 'facealpha', 0);
@@ -322,6 +380,9 @@ switch method
             
         elseif stateS.optS.difference
             %
+            if isempty(img1) || isempty(img2)
+                return
+            end
             xdim = min(size(img1,1), size(img2,1));
             ydim = min(size(img1,2), size(img2,2));
             imgOv = imabsdiff(img1(1:xdim, 1:ydim), img2(1:xdim, 1:ydim));
@@ -357,7 +418,7 @@ switch method
         %wy enable base image display %
         %img23D = repmat(zeros(size(img1)), [1 1 3]);
         img23D = zeros([size(img1) 3]);
-        ud = stateS.handle.controlFrameUd ;
+        %ud = stateS.handle.controlFrameUd ;
         clrVal = get(ud.handles.basedisplayModeColor,'value');
         
         switch num2str(clrVal)
@@ -473,7 +534,6 @@ switch method
         set(stateS.handle.aI(axNum).scanObj(baseIndex).handles,'cData',img23D);
         
         %wy
-        
         
         img23D = repmat(zeros(size(img2)), [1 1 3]);
         ud = stateS.handle.controlFrameUd ;

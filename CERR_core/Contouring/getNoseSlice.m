@@ -1,4 +1,4 @@
-function sliceNum = getNoseSlice(outerStrMask3M,planC,outerStrName)
+function [sliceNum, planC] = getNoseSlice(outerStrMask3M,planC,outerStrName)
 % Automatically identify nose slice in H&N CT scans based on
 % first non-zero row of mask.
 %
@@ -20,12 +20,11 @@ else
     indexS = planC{end};
     strC = {planC{indexS.structures}.structureName};
     strIdx = getMatchingIndex(outerStrName,strC,'exact');
-    mask3M = getStrMask(strIdx, planC);
-    
+    [mask3M, planC] = getStrMask(strIdx, planC);
 end
 
 startSliceIdx = 11;
-endSliceIdx = 70;
+endSliceIdx = min(size(mask3M,3),100);
 supMask3M = double(mask3M(:,:,startSliceIdx:endSliceIdx));
 
 %Identify first non-zero row
@@ -39,8 +38,12 @@ minRowV = movmean(minRowV,5,'omitnan');
 
 %Compute difference & identify min
 %[~,mins] = min(diff([NaN;minRowV]));
-[~,mins] = findpeaks(-minRowV,'MinPeakWidth',2, 'MaxPeakWidth',10);
-sliceNum = mins(1) + startSliceIdx -1;
+[~,mins] = findpeaks(-minRowV,'MinPeakWidth',2, 'MaxPeakWidth',40);
+if ~isempty(mins)
+    sliceNum = mins(1) + startSliceIdx -1;
+else
+    sliceNum=1; %default
+end
 
 
 end

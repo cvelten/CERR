@@ -43,7 +43,7 @@ function dataS = populate_planC_scan_scanInfo_field(fieldname, dcmdir_PATIENT_ST
 
 %For easier handling
 
-global pPos xOffset yOffset;
+global xOffset yOffset;
 
 IMAGE = dcmdir_PATIENT_STUDY_SERIES_IMAGE;
 
@@ -255,7 +255,7 @@ switch fieldname
         %Image Position (Patient)
         imgpos = getTagValue(attr, '00200032');
         
-        imgOri = getTagValue(attr, '00200037');
+        imgOriV = getTagValue(attr, '00200037');
         
         modality = getTagValue(attr, '00080060');
         
@@ -263,54 +263,80 @@ switch fieldname
             % Multiframe NM image.
             detectorInfoSequence = getTagValue(attr, '00540022');
             imgpos = detectorInfoSequence.Item_1.ImagePositionPatient;
-            imgOri = detectorInfoSequence.Item_1.ImageOrientationPatient;
+            imgOriV = detectorInfoSequence.Item_1.ImageOrientationPatient;
+        end
+        
+        if isempty(imgpos) && strcmpi(modality,'MR')
+            % Multiframe MR image.
+            positionRefIndicatorSequence = getTagValue(attr, '52009230');
+            imgpos = positionRefIndicatorSequence.Item_1...
+                .PlanePositionSequence.Item_1.ImagePositionPatient;
+            imgOriV = positionRefIndicatorSequence.Item_1...
+                .PlaneOrientationSequence.Item_1.ImageOrientationPatient;   
         end
         
         %Pixel Spacing
         if ismember(modality,{'MG','SM'})
             pixspac = getTagValue(attr, '00181164');
-            imgOri = zeros(6,1);
-            imgpos = [0 0 0];
+            imgOriV = zeros(6,1);
+            imgpos = [0 0 0];        
         else
             pixspac = getTagValue(attr, '00280030');
+        end
+        
+        if isempty(pixspac) && strcmpi(modality,'MR')
+            pixspac = positionRefIndicatorSequence.Item_1...
+                        .PixelMeasuresSequence.Item_1.PixelSpacing;            
         end
         
         %Columns
         nCols  = getTagValue(attr, '00280011');
         
-        % check for oblique scan
-        if strcmpi(pPos,'oblique')
-            isOblique = 1;
-        else
+        %Check for oblique scan
+        if max(abs((imgOriV(:) - [1 0 0 0 1 0]'))) < 1e-3
+            %HFS
             isOblique = 0;
+        elseif  max(abs((imgOriV(:) - [-1 0 0 0 1 0]'))) < 1e-3
+            %FFS;
+            isOblique = 0;
+        elseif max(abs((imgOriV(:) - [-1 0 0 0 -1 0]'))) < 1e-3
+            %HFP
+            isOblique = 0;
+        elseif max(abs((imgOriV(:) - [1 0 0 0 -1 0]'))) < 1e-3
+            %FFP
+            isOblique = 0;
+        else
+            %OBLIQUE
+            isOblique = 1;
         end
         
-        if ~isOblique && (imgOri(1)-1)^2 < 1e-5
+        if ~isOblique && (imgOriV(1)-1)^2 < 1e-5
             xOffset = imgpos(1) + (pixspac(2) * (nCols - 1) / 2);
-        elseif ~isOblique && (imgOri(1)+1)^2 < 1e-5
+        elseif ~isOblique && (imgOriV(1)+1)^2 < 1e-5
             xOffset = imgpos(1) - (pixspac(2) * (nCols - 1) / 2);
         else
             % by Deshan Yang, 3/2/2010
             xOffset = imgpos(1);
-            %pPos = ''; %AI mod
         end
         %         xOffset = imgpos(1) + (pixspac(1) * (nCols - 1) / 2);
         
         %Convert from DICOM mm to CERR cm.
         if ~isOblique
-            switch upper(pPos)
-                case 'HFS'
-                    dataS = xOffset / 10;
-                case {'HFP', 'HFDR'}
-                    dataS = -xOffset / 10;
-                case 'FFS'
-                    dataS = -xOffset / 10;
-                case 'FFP'
-                    dataS = xOffset / 10;
-                otherwise
-                    dataS = xOffset / 10;
+            if max(abs((imgOriV(:) - [1 0 0 0 1 0]'))) < 1e-3
+                %'HFS'
+                dataS = xOffset / 10;
+            elseif max(abs((imgOriV(:) - [-1 0 0 0 -1 0]'))) < 1e-3
+                %'HFP', 'HFDR'
+                dataS = -xOffset / 10;
+            elseif  max(abs((imgOriV(:) - [-1 0 0 0 1 0]'))) < 1e-3
+                %'FFS'
+                dataS = -xOffset / 10;
+            elseif max(abs((imgOriV(:) - [1 0 0 0 -1 0]'))) < 1e-3
+                %FFP
+                dataS = xOffset / 10;
+            else
+                dataS = xOffset / 10;
             end
-            
         else
             dataS = xOffset / 10;
         end
@@ -320,62 +346,88 @@ switch fieldname
     case 'yOffset'
         %Image Position (Patient)
         imgpos = getTagValue(attr, '00200032');
-        imgOri = getTagValue(attr, '00200037');
+        imgOriV = getTagValue(attr, '00200037');
         modality = getTagValue(attr, '00080060');
         if isempty(imgpos) && strcmpi(modality,'NM')
             % Multiframe NM image.
             detectorInfoSequence = getTagValue(attr, '00540022');
             imgpos = detectorInfoSequence.Item_1.ImagePositionPatient;
-            imgOri = detectorInfoSequence.Item_1.ImageOrientationPatient;
+            imgOriV = detectorInfoSequence.Item_1.ImageOrientationPatient;
         end
+        
+        if isempty(imgpos) && strcmpi(modality,'MR')
+            % Multiframe MR image.
+            positionRefIndicatorSequence = getTagValue(attr, '52009230');
+            imgpos = positionRefIndicatorSequence.Item_1...
+                .PlanePositionSequence.Item_1.ImagePositionPatient;
+            imgOriV = positionRefIndicatorSequence.Item_1...
+                .PlaneOrientationSequence.Item_1.ImageOrientationPatient;               
+        end        
         
         %Pixel Spacing
         if ismember(modality,{'MG','SM'})
             pixspac = getTagValue(attr, '00181164');
-            imgOri = zeros(6,1);
+            imgOriV = zeros(6,1);
             imgpos = [0 0 0];
         else
             pixspac = getTagValue(attr, '00280030');
         end
         
-        % check for oblique scan
-        if strcmpi(pPos,'oblique')
-            isOblique = 1;
-        else
-            isOblique = 0;
-        end
+        if isempty(pixspac) && strcmpi(modality,'MR')
+            pixspac = positionRefIndicatorSequence.Item_1...
+                        .PixelMeasuresSequence.Item_1.PixelSpacing;            
+        end        
         
+        %Check for oblique scan
+        if max(abs((imgOriV(:) - [1 0 0 0 1 0]'))) < 1e-3
+            %HFS
+            isOblique = 0;
+        elseif  max(abs((imgOriV(:) - [-1 0 0 0 1 0]'))) < 1e-3
+            %FFS;
+            isOblique = 0;
+        elseif max(abs((imgOriV(:) - [-1 0 0 0 -1 0]'))) < 1e-3
+            %HFP
+            isOblique = 0;
+        elseif max(abs((imgOriV(:) - [1 0 0 0 -1 0]'))) < 1e-3
+            %FFP
+            isOblique = 0;
+        else
+            %OBLIQUE
+            isOblique = 1;
+        end
         
         %Rows
         nRows  = getTagValue(attr, '00280010');
         
-        if ~isOblique && (imgOri(5)-1)^2 < 1e-5
+        if ~isOblique && (imgOriV(5)-1)^2 < 1e-5
             yOffset = imgpos(2) + (pixspac(1) * (nRows - 1) / 2);
-        elseif ~isOblique && (imgOri(5)+1)^2 < 1e-5
+        elseif ~isOblique && (imgOriV(5)+1)^2 < 1e-5
             yOffset = imgpos(2) - (pixspac(1) * (nRows - 1) / 2);
         else
             % by Deshan Yang, 3/2/2010
             yOffset = imgpos(2);
-            %pPos = ''; %AI mod
         end
         %         yOffset = imgpos(2) + (pixspac(2) * (nRows - 1) / 2);
         
         %Convert from DICOM mm to CERR cm, invert to match CERR y dir.
         if ~isOblique
-            switch upper(pPos)
-                case 'HFS'
-                    dataS = - yOffset / 10;
-                case {'HFP', 'HFDR'}
-                    dataS = yOffset / 10;
-                case 'FFS'
-                    dataS = - yOffset / 10;
-                case 'FFP'
-                    dataS = yOffset / 10;
-                otherwise
-                    dataS = yOffset / 10;
+            if max(abs((imgOriV(:) - [1 0 0 0 1 0]'))) < 1e-3
+                %'HFS'
+                dataS = - yOffset / 10;
+            elseif max(abs((imgOriV(:) - [-1 0 0 0 -1 0]'))) < 1e-3
+                %'HFP', 'HFDR'
+                dataS = yOffset / 10;
+            elseif  max(abs((imgOriV(:) - [-1 0 0 0 1 0]'))) < 1e-3
+                %'FFS'
+                dataS = - yOffset / 10;
+            elseif max(abs((imgOriV(:) - [1 0 0 0 -1 0]'))) < 1e-3
+                %FFP
+                dataS = yOffset / 10;
+            else
+                dataS = yOffset / 10;
             end
         else
-            dataS = yOffset / 10;  %?
+            dataS = yOffset / 10;
         end
         
         yOffset = dataS; %done for setting global, used in Structure coord
@@ -506,17 +558,13 @@ switch fieldname
         
     case 'patientPosition'
         
-        dataS = pPos;
-%         if attr.contains(hex2dec('00185100'))
-%             dataS  = getTagValue(attr, '00185100');
-%         end
-        
-    case 'imageOrientationPatient'
-        dataS  = getTagValue(attr, '00200037');
-        
+        %dataS = pPos;
+        if attr.contains(hex2dec('00185100'))
+            dataS  = getTagValue(attr, '00185100');
+        end
+                
     case 'imagePositionPatient'
         dataS  = getTagValue(attr, '00200032');
-
         
     case 'bValue' %REPLACED EL WITH TAG
         % b-value for MR scans (vendor specific private tag)
@@ -551,10 +599,26 @@ switch fieldname
     case 'acquisitionDate'
         dataS  = getTagValue(attr, '00080022');
     case 'acquisitionTime'
-        dataS  = getTagValue(attr, '00080030');
+        dataS  = getTagValue(attr, '00080032');
+    case 'seriesDate'
+        dataS  = getTagValue(attr, '00080021');
+    case 'seriesTime'
+        dataS = getTagValue(attr, '00080031');
+    case 'correctedImage'
+        dataS = getTagValue(attr, '00280051');
+    case 'decayCorrection'
+        dataS = getTagValue(attr, '00541102');
     case 'patientWeight'
         dataS  = getTagValue(attr, '00101030');
-    case 'RadiopharmaInfoS'
+    case 'patientSize'
+        dataS  = getTagValue(attr, '00101020');
+    case 'patientBmi'
+        dataS  = getTagValue(attr, '00101022');
+    case 'patientSex' 
+        dataS  = getTagValue(attr, '00100040');
+    case 'suvType'
+        dataS  = getTagValue(attr, '00541006');
+    case 'RadiopharmaInfoS'        
         dataS  = getTagValue(attr, '00540016');
         if isfield(dataS,'Item_1')
             dataS = dataS.Item_1;
@@ -587,7 +651,16 @@ switch fieldname
             dataS = getTagValue(attr, '00541000');
         end
         
-    case 'petImageUnits'
+    case 'petActivityConcentrationScaleFactor'
+        if attr.contains(hex2dec('70531009'))
+            dataS = getTagValue(attr, '70531009');
+            if isnumeric(dataS)
+                strV = native2unicode(dataS);
+                dataS = str2double(strV);
+            end
+        end
+        
+    case 'imageUnits'
         if attr.contains(hex2dec('00541001'))
             dataS = getTagValue(attr, '00541001');
         end
@@ -611,6 +684,17 @@ switch fieldname
         if attr.contains(hex2dec('00280051'))
             dataS = getTagValue(attr, '00280051');
         end
+        
+    case 'windowCenter'
+        if attr.contains(hex2dec('00281050'))
+            dataS = getTagValue(attr, '00281050');
+        end
+        
+    case 'windowWidth'
+        if attr.contains(hex2dec('00281051'))
+            dataS = getTagValue(attr,'00281051');
+        end
+
                 
     otherwise
         % warning(['DICOM Import has no methods defined for import into the planC{indexS.scan}.scanInfo' fieldname ' field, leaving empty.']);

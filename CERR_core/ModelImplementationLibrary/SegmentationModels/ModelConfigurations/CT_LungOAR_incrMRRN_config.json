@@ -1,39 +1,67 @@
 {
 "strNameToLabelMap" : [
 {
-    "structureName": "Heart",
-
+    "structureName": "Lung_Left",
     "value": 1
     },
 {
-      "structureName": "Lungs",
+      "structureName": "Lung_Right",
       "value": 2
     },
 {
-      "structureName": "Easophagus",
+      "structureName": "Heart",
       "value": 3
     },
 {
-      "structureName": "Cord",
+      "structureName": "Esophagus",
       "value": 4
+    },
+{
+      "structureName": "Cord",
+      "value": 5
     }
-
-
 ],
-"batchSize" : 1,
+
+"scan":{
+
+        "identifier" : {"imageType": "CT SCAN"},
+
+
+	"crop": [{
+      		"method": "none",
+      		"params": "",
+      		"operator": ""
+    		} ]
+
+      },
+
+"batchSize" : 1 ,
+
+"postProc" : {"Lung_Left": [{"method": "removeBackgroundFP"}], 
+          "Lung_Right": [{"method": "removeBackgroundFP"}],
+          "Heart": [{"method": "removeBackgroundFP"}],
+          "Esophagus": [{"method": "removeBackgroundFP"}],
+          "Cord": [{"method": "removeBackgroundFP"}]
+},
 
 "passedScanDim" : "3D",
 
-"resize" : {"method": "none",
-            "size" : [256,256]},
+"reference" : "10.1109/TMI.2018.2857800",
+	
+"notes" : {
+"preprocessing" : [
+{
+    "imageOffset" : 1024,
+    "rotation" : { "angle": 90, "axis": "+Z" } , 
+    "flipdim" : "none" ,
+    "couchFlag" : 1 
+    }
+],
 
-"crop": [
-    {
-      "method": "crop_pt_outline_2D",
-      "params": { "structureName": "generated_pt_outline", "outStrName":"generated_pt_outline", "saveStrToPlanCFlag": 1, "outlineThreshold": -400},
-      "operator": ""
-    }],
-
-
-"reference" : "10.1109/TMI.2018.2857800"
+"algorithm" : { 
+    "algorithmName" : "CT_LungOAR_incrMRRN" , 
+    "version" : "197a625", 
+    "releaseDate" : "2020/11/10" 
+}
+}
 }

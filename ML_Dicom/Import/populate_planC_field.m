@@ -1,4 +1,5 @@
-function dataS = populate_planC_field(cellName, dcmdir_patient, optS)
+
+function dataS = populate_planC_field(cellName, dcmdir_patient, optS, varargin)
 %"populate_planC_field"
 %   Given the name of a child cell to planC, such as 'scan', 'dose',
 %   'comment', etc. return a copy of that cell with all fields properly
@@ -37,7 +38,7 @@ function dataS = populate_planC_field(cellName, dcmdir_patient, optS)
 % along with CERR.  If not, see <http://www.gnu.org/licenses/>.
 
 %Get template for the requested cell.
-persistent rtPlans
+persistent rtPlans scanOriS
 structS = initializeCERR(cellName);
 names   = fields(structS);
 
@@ -66,6 +67,8 @@ switch cellName
         
         %ctSeries = length(find(seriesC(strcmpi(typeC, 'CT'))==1));
         
+        %Initialize structure to store image orientation per scan.
+        scanOriS = struct();
         %Place each series (CT, MR, etc.) into its own array element.
         for seriesNum = 1:length(seriesC)
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -86,7 +89,6 @@ switch cellName
             
             % Test IOP here to find if it is "nominal" or "non-nominal"
             % % %             outIOP = getTest_Scan_IOP(seriesC{seriesNum}.Data(1).file);
-            
             if ismember(typeC{seriesNum},{'CT','OT','NM','MR','PT','ST','MG','SM'})
                 
                 %Populate each field in the scan structure.
@@ -140,8 +142,8 @@ switch cellName
                     minScanVal = min(dataS(scansAdded+1).scanArray(:));
                     if abs(rescaleSlope - 1) > eps*1e5
                         dataS(scansAdded+1).scanArray = ...
-                            single(int32(dataS(scansAdded+1).scanArray) * ...
-                            rescaleSlope + dataS(scansAdded+1).scanInfo(1).rescaleIntercept);
+                            single(dataS(scansAdded+1).scanArray) * ...
+                            single(rescaleSlope) + single(dataS(scansAdded+1).scanInfo(1).rescaleIntercept);
                     elseif  minScanVal * dataS(scansAdded+1).scanInfo(1).rescaleSlope + ...
                             dataS(scansAdded+1).scanInfo(1).CTOffset + ...
                             dataS(scansAdded+1).scanInfo(1).rescaleIntercept < 0
@@ -183,10 +185,10 @@ switch cellName
                 for i = 1:length(names)
                     dataS(scansAdded+1).(names{i}) = populate_planC_USscan_field(names{i}, seriesC{seriesNum}, typeC{seriesNum});
                 end
-                
                 scansAdded = scansAdded + 1;
             end
-            
+             scanOriS(scansAdded).scanUID = dataS(scansAdded).scanUID;
+             scanOriS(scansAdded).imageOrientationPatient = dataS(scansAdded).scanInfo(1).imageOrientationPatient;
         end
         
         
@@ -198,6 +200,12 @@ switch cellName
         [seriesC, typeC]    = extract_all_series(dcmdir_patient);
         supportedTypes      = {'RTSTRUCT'};
         structsAdded          = 0;
+        
+        % Get scan object from varargin if it is not empty. 
+        % for inserting structures to existing planC
+        if ~isempty(varargin)
+            scanOriS = varargin{1};
+        end
         
         hWaitbar = waitbar(0,'Loading Structures Please wait...');
         
@@ -255,7 +263,7 @@ switch cellName
                         for i = 1:length(names)
                             dataS(structsAdded+1).(names{i}) = ...
                                 populate_planC_structures_field(names{i}, ...
-                                RTSTRUCT, structNum, strobj, optS);
+                                RTSTRUCT, structNum, scanOriS, strobj, optS);
                         end
                         %curStructNum = curStructNum + 1;
                         structsAdded = structsAdded + 1;
@@ -407,14 +415,18 @@ switch cellName
                         RTDOSE(doseNum), doseobj, rtPlans, optS);
 
                     if ~isempty(dvhsequence)
+                        
+                        structureNameC = {};
+                        structureNumberV = [];
+                        
                         % get a list of Structure Names
                         for seriesNumStr = 1:length(seriesC)
 
                             if strcmpi(typeC{seriesNumStr}, 'RTSTRUCT')
 
                                 RTSTRUCT = seriesC{seriesNumStr}.Data;   
-                                structureNameC = {};
-                                structureNumberV = [];
+                                %structureNameC = {};
+                                %structureNumberV = [];
                                 for k = 1:length(RTSTRUCT)
                                     strobj  = scanfile_mldcm(RTSTRUCT(k).file);
 
@@ -429,9 +441,9 @@ switch cellName
                                     for js = 1:nStructures
                                         %get Structure name
                                         structureNameC{end+1} = ...
-                                            populate_planC_structures_field('structureName', RTSTRUCT, js, strobj, optS);
+                                            populate_planC_structures_field('structureName', RTSTRUCT, js, scanOriS, strobj, optS);
                                         structureNumberV(end+1) = ...
-                                            populate_planC_structures_field('roiNumber', RTSTRUCT, js, strobj, optS);
+                                            populate_planC_structures_field('roiNumber', RTSTRUCT, js, scanOriS, strobj, optS);
                                     end                                    
                                 end
 
